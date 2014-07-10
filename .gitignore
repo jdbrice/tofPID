@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Compiled Object files
 *.slo
 *.lo
@@ -19,3 +20,25 @@
 *.exe
 *.out
 *.app
+=======
+#Remove bulky root files
+*.root
+
+# Remove data files in the script folder used for testing 
+/script/*
+!/script/*.C
+
+#remove OS X system files
+*_*
+
+# Remove build files
+/src/*.o
+
+#remove items in bin used for managing different jobs
+/bin/*.dat
+/bin/*.pdf
+/bin/*.xml
+# but keep the sample config
+!/bin/config.xml
+
+>>>>>>> upstream/master

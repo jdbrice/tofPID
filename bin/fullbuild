@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-cd ../src
-make clean
-make
-cd ../bin
