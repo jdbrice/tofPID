@@ -11,7 +11,7 @@
 	</output>
 
 	<!-- histograms -->
-	<histo>
+	<histo hide="true">
 		
 		<m2p type="2D" title="M^{2} vs momentum; p [GeV]; M^{2} [GeV^{2}/c^{2}]"  nBinsX="200" x1="0" x2="3"
 				nBinsY="1000" y1="-.2" y2="1.4" />
