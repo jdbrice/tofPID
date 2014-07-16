@@ -69,6 +69,7 @@ void pidHistogramMaker::loopEvents() {
 
 	book->make( config, "histo.m2p" );
 	book->make( config, "histo.m2" );
+	book->make( config, "histo.iBeta" );
 	
 	// loop over all events
 	for(Int_t i=0; i<nevents; i++) {
@@ -77,11 +78,18 @@ void pidHistogramMaker::loopEvents() {
     	double tStart = pico->tStart;
     	Int_t refMult = pico->refMult;
 
+    	
+
     	int nTofHits = pico->nTofHits;
     	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
+
+    		//if ( abs( pico->nSigPi[ iHit ] ) > 2 )
+    		//	continue;
+
     		double le = pico->leTime[ iHit ];
     		double length = pico->length[ iHit ];
     		double tof = pico->tof[ iHit ];
+    		double beta = pico->beta[ iHit ];
 
     		double p = pico->p[ iHit ];
 
@@ -89,6 +97,8 @@ void pidHistogramMaker::loopEvents() {
     		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
     		book->fill( "m2p", p, m2 );
     		book->fill( "m2", m2 );
+
+    		book->fill( "iBeta", p, (1.0/beta) );
     		
 
     	}
@@ -96,12 +106,16 @@ void pidHistogramMaker::loopEvents() {
 	} // end loop on events
 
 	report->newPage();
-	book->style("m2p")->set( config, "style.mass2" )->draw();
+	book->style("m2p")->set( config, "style.log2D" )->draw();
+	report->savePage();
+
+	report->newPage();
+	book->style("iBeta")->set( config, "style.log2D" )->draw();
 	report->savePage();
 
 	report->newPage();
 	gPad->SetLogy( 1 );
-	book->style("m2")->set( "draw", config->getString("histo.m2:draw"))->draw();
+	book->style("m2")->set( config, "style.log1D" )->draw();
 	report->savePage();
 
 
