@@ -1,0 +1,25 @@
+<config>
+
+	<input>
+		<rootIn file="qa.root" />
+		<dataDir maxFiles="10" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
+	</input>
+	<output>
+		<base></base>
+		<root>qa.root</root>
+		<report>rqa.pdf</report>
+	</output>
+
+	<!-- histograms -->
+	<histo>
+		<m2p type="1D" title="M^2 vs momentum; p [GeV]; M^2 [GeV^2/c^2]"  nBinsX="300" x1="0" x2="13000000"/>
+	</histo>
+
+
+	<!-- Analysis cuts -->
+	<cut>
+		<central>.05</central>
+		<peripheral>.40</peripheral>
+	</cut>
+
+</config>
