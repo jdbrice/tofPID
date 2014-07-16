@@ -69,9 +69,12 @@ void pidHistogramMaker::loopEvents() {
 
 	book->make( "histo.m2p" );
 	book->make( "histo.m2" );
+	book->make( "histo.m2dedx" );
 	book->make( "histo.iBeta" );
-	book->make( "histo.dedxVBeta" );
+	book->make( "histo.dedxVsBeta" );
 	book->make( "histo.dedxP" );
+	book->make( "histo.deltaB" );
+	book->make( "histo.deltaBSigPi" );
 	
 	// loop over all events
 	for(Int_t i=0; i<nevents; i++) {
@@ -97,14 +100,16 @@ void pidHistogramMaker::loopEvents() {
     		double dedx = pico->dedx[ iHit ];
     		
     		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
-    		book->fill( "m2p", p, m2 );
-    		book->fill( "m2", m2 );
-
-    		book->fill( "iBeta", p, (1.0/beta) );
+    		double deltaB = 1 - beta * TMath::Sqrt( 1 - m2 / ( p*p )  );
     		
-    		book->fill( "dedxVBeta", TMath::Exp( beta ), TMath::Log( dedx ) );
-
+    		book->fill( "m2p", p, m2 );
+    		book->fill( "m2dedx", TMath::Log(dedx), m2 );
+    		book->fill( "m2", m2 );
+    		book->fill( "iBeta", p, (1.0/beta) );
+    		book->fill( "dedxVsBeta", TMath::Exp( beta ), TMath::Log( dedx ) );
     		book->fill( "dedxP", p, dedx );
+    		book->fill( "deltaB", deltaB );
+    		book->fill( "deltaBSigPi", deltaB, pico->nSigPi[iHit] );
 
     	}
     	
@@ -119,11 +124,19 @@ void pidHistogramMaker::loopEvents() {
 	report->savePage();
 
 	report->newPage();
-	book->style("dedxVBeta")->set( "style.log2D" )->draw();
+	book->style("m2dedx")->set( "style.log2D" )->draw();
+	report->savePage();
+
+	report->newPage();
+	book->style("dedxVsBeta")->set( "style.log2D" )->draw();
 	report->savePage();
 
 	report->newPage();
 	book->style("dedxP")->set( "style.log2D" )->draw();
+	report->savePage();
+
+	report->newPage();
+	book->style("deltaBSigPi")->set( "style.log2D" )->draw();
 	report->savePage();
 
 	report->newPage();
