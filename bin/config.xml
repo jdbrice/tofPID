@@ -19,7 +19,7 @@
 
 	<style>
 		<1D draw="h" linecolor="1" logY="0" />
-		<mass2 draw="colz" logZ="1" />
+		<mass2p draw="colz" logZ="1" />
 	</style>
 
 	<!-- Analysis cuts -->

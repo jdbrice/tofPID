@@ -96,7 +96,7 @@ void pidHistogramMaker::loopEvents() {
 	} // end loop on events
 
 	report->newPage();
-	book->style("m2p")->set( "draw", config->getString("histo.m2p:draw"))->draw();
+	book->style("m2p")->set( config, "style.mass2" )->draw();
 	report->savePage();
 
 	report->newPage();
