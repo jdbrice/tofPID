@@ -68,12 +68,14 @@ void pidHistogramMaker::loopEvents() {
 	//book->make1D( "length", "length", 1000, 0, 500 );
 
 	book->make( config, "histo.m2p" );
+	book->make( config, "histo.m2" );
 	
 	// loop over all events
 	for(Int_t i=0; i<nevents; i++) {
     	_chain->GetEntry(i);
 
     	double tStart = pico->tStart;
+    	Int_t refMult = pico->refMult;
 
     	int nTofHits = pico->nTofHits;
     	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
@@ -83,14 +85,24 @@ void pidHistogramMaker::loopEvents() {
 
     		double p = pico->p[ iHit ];
 
+    		
     		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
+    		book->fill( "m2p", p, m2 );
+    		book->fill( "m2", m2 );
     		
 
     	}
     	
-
-		
 	} // end loop on events
+
+	report->newPage();
+	book->style("m2p")->set( "draw", config->getString("histo.m2p:draw"))->draw();
+	report->savePage();
+
+	report->newPage();
+	gPad->SetLogy( 1 );
+	book->style("m2")->set( "draw", config->getString("histo.m2:draw"))->draw();
+	report->savePage();
 
 
 	cout << "[pidHistogramMaker." << __FUNCTION__ << "] completed in " << elapsed() << " seconds " << endl;
