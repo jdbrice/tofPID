@@ -28,7 +28,7 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	gStyle->SetOptStat( 0 );
 	
 	// create the histogram book
-	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ) );
+	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config );
 	
 	// create a report builder 
 	report = new reporter( config->getString( "output.base" ) + config->getString( "output.report" ) );
@@ -67,9 +67,11 @@ void pidHistogramMaker::loopEvents() {
 
 	//book->make1D( "length", "length", 1000, 0, 500 );
 
-	book->make( config, "histo.m2p" );
-	book->make( config, "histo.m2" );
-	book->make( config, "histo.iBeta" );
+	book->make( "histo.m2p" );
+	book->make( "histo.m2" );
+	book->make( "histo.iBeta" );
+	book->make( "histo.dedxVBeta" );
+	book->make( "histo.dedxP" );
 	
 	// loop over all events
 	for(Int_t i=0; i<nevents; i++) {
@@ -92,7 +94,7 @@ void pidHistogramMaker::loopEvents() {
     		double beta = pico->beta[ iHit ];
 
     		double p = pico->p[ iHit ];
-
+    		double dedx = pico->dedx[ iHit ];
     		
     		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
     		book->fill( "m2p", p, m2 );
@@ -100,22 +102,32 @@ void pidHistogramMaker::loopEvents() {
 
     		book->fill( "iBeta", p, (1.0/beta) );
     		
+    		book->fill( "dedxVBeta", TMath::Exp( beta ), TMath::Log( dedx ) );
+
+    		book->fill( "dedxP", p, dedx );
 
     	}
     	
 	} // end loop on events
 
 	report->newPage();
-	book->style("m2p")->set( config, "style.log2D" )->draw();
+	book->style("m2p")->set( "style.log2D" )->draw();
 	report->savePage();
 
 	report->newPage();
-	book->style("iBeta")->set( config, "style.log2D" )->draw();
+	book->style("iBeta")->set( "style.log2D" )->draw();
 	report->savePage();
 
 	report->newPage();
-	gPad->SetLogy( 1 );
-	book->style("m2")->set( config, "style.log1D" )->draw();
+	book->style("dedxVBeta")->set( "style.log2D" )->draw();
+	report->savePage();
+
+	report->newPage();
+	book->style("dedxP")->set( "style.log2D" )->draw();
+	report->savePage();
+
+	report->newPage();
+	book->style("m2")->set( "style.log1D" )->draw();
 	report->savePage();
 
 

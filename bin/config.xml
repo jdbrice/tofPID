@@ -15,15 +15,19 @@
 		
 		<m2p type="2D" title="M^{2} vs momentum; p [GeV]; M^{2} [GeV^{2}/c^{2}]"  nBinsX="200" x1="0" x2="3"
 				nBinsY="1000" y1="-.2" y2="1.4" />
+		<dedxP type="2D" title="dedx vs momentum; p [GeV]; dedx"  nBinsX="200" x1="0" x2="3"
+				nBinsY="1000" y1="-10" y2="10" />
 		<iBeta type="2D" title="1/#beta vs momentum; p [GeV]; 1/#beta"  nBinsX="200" x1="0" x2="3"
 				nBinsY="1000" y1="0" y2="5" />
 		<m2 type="1D" title="M^{2}; M^{2} [GeV^{2}/c^{2}]; N_{Events}"  nBinsX="100" x1="-.4" x2="1.2" draw="h" />
+		<dedxVsBeta type="2D" title="Log(dedx) vs Exp( #beta ); exp( #beta ); log( dedx )"
+					nBinsX="100" x1="1" x2="3" nBinsY="200" y1="0.1" y2="5" />
 
 	</histo>
 
 	<style>
 		<1D draw="h" linecolor="1" logY="0" />
-		<log1D draw="h" linecolor="1" logY="1" />
+		<log1D draw="h" linecolor="1" logY="2" />
 		<log2D draw="colz" logZ="1" />
 	</style>
 
