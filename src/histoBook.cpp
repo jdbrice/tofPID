@@ -40,6 +40,7 @@ histoBook::histoBook( string name, string input, string inDir ){
 		fin->cd( inDir.c_str() );
 		loadRootDir( gDirectory, inDir );
 	}
+
 }
 
 /**
@@ -193,6 +194,9 @@ void histoBook::make( xmlConfig * config, string nodeName ){
 		if ( "" == hName )
 			hName = nodeName;
 
+		// store the path in the config file
+		configPath[ hName ] = nodeName;
+
 		string type = config->getString( nodeName + ":type", "1D" );
 
 		if ( "1D" == type ){
@@ -207,9 +211,26 @@ void histoBook::make( xmlConfig * config, string nodeName ){
 					config->getInt( nodeName + ":nBinsY", 1 ), config->getDouble( nodeName + ":y1", 0 ),
 					config->getDouble( nodeName + ":y2", 1 ) );
 		}
+
 	
 	}
 
+}
+void histoBook::makeAll( xmlConfig * con, string nodeName ){
+	
+	if ( !con )
+		return;
+	vector<string> paths = con->childrenOf( nodeName );
+
+	for ( int i=0; i < paths.size(); i++ ){
+		make( paths[ i ] );
+	}
+}
+void histoBook::makeAll( string nodeName ){
+	if ( !config )
+		return;
+
+	makeAll( config, nodeName );
 }
 
 void histoBook::make1F( string name, string title, uint nBins, double low, double hi  ){
@@ -302,6 +323,12 @@ void histoBook::globalStyle(){
 
 histoBook* histoBook::style( string histName ){
 	styling = histName;
+
+	// set the default style if it is there
+	if ( config && config->nodeExists( configPath[ histName ] + ".style" ) ){
+		set( configPath[histName] + ".style" );
+	}
+
 	return this;
 }
 
@@ -386,7 +413,17 @@ histoBook* histoBook::set( string opt, vector<string> params ){
 	    } else if ( "draw" == opt ){
 	    	drawOption = cParam(params, 0);
 	    } else if ( "linecolor" == opt ){
-	    	h->SetLineColor( (int) dParam( params, 0) );
+	    	int c = color( cParam( params, 0) );
+	    	if ( c  < 0 )
+	    		c = (int) dParam( params, 0);
+	    	h->SetLineColor( c );
+	    } else if ( "fillcolor" == opt ){
+	    	int c = color( cParam( params, 0) );
+	    	if ( c  < 0 )
+	    		c = (int) dParam( params, 0);
+	    	h->SetFillColor( c );
+	    } else if ( "linewidth" == opt ){
+	    	h->SetLineWidth( dParam( params, 0) );
 	    } else if ( "domain" == opt ){
 	    	double min = dParam( params, 0);
 	    	double max = dParam( params, 1);
@@ -419,7 +456,10 @@ histoBook* histoBook::set( string opt, vector<string> params ){
 	    	
 	    	h->GetYaxis()->SetRangeUser( min, max );
 	    } else if ( "markercolor" == opt ) {
-	    	h->SetMarkerColor( (int)dParam( params, 0) );
+	    	int c = color( cParam( params, 0) );
+	    	if ( c  < 0 )
+	    		c = (int) dParam( params, 0);
+	    	h->SetMarkerColor( c );
 	    } else if ( "markerstyle" == opt ) {
 	    	h->SetMarkerStyle( (int)dParam( params, 0) );
 	    } else if ( "legend" == opt ){

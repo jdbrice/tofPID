@@ -39,6 +39,7 @@ private:
 
 	string currentDir;
 
+	std::map<string, string> configPath;
 	std::map<string, TH1*> book;
 	
 	string filename;
@@ -76,6 +77,8 @@ public:
 					uint nBinsX, const Double_t* xBins, uint nBinsY, double lowY, double hiY );
 	void make( xmlConfig * config, string nodeName );
 	void make( string nodeName );
+	void makeAll( string nodeName );
+	void makeAll( xmlConfig * config, string nodeName );
 
 	TLegend* getLegend() { return legend; }
 
@@ -103,6 +106,17 @@ public:
 
 
 
+	int color( string color ) {
+		if ( "red" == color )
+			return kRed;
+		if ( "green" == color )
+			return kGreen;
+		if ( "blue" == color )
+			return kBlue;
+		if ( "black" == color )
+			return kBlack;
+		return -1;
+	}
 
 private:
 	void globalStyle();
@@ -127,6 +141,9 @@ private:
 		else 
 			return def;
 	}
+
+	
+
 
 
 };
