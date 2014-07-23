@@ -74,6 +74,7 @@ void pidHistogramMaker::loopEvents() {
 	book->make( "histo.dedxVsBeta" );
 	book->make( "histo.dedxP" );
 	book->make( "histo.deltaB" );
+	book->make( "histo.deltaBPi" );
 	book->make( "histo.deltaBSigPi" );
 	
 	// loop over all events
@@ -101,6 +102,7 @@ void pidHistogramMaker::loopEvents() {
     		
     		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
     		double deltaB = 1 - beta * TMath::Sqrt( 1 - m2 / ( p*p )  );
+    		double deltaBPi = 1 - beta * TMath::Sqrt( 1 - (.139*.139) / ( p*p ) );
     		
     		book->fill( "m2p", p, m2 );
     		book->fill( "m2dedx", TMath::Log(dedx), m2 );
@@ -109,6 +111,7 @@ void pidHistogramMaker::loopEvents() {
     		book->fill( "dedxVsBeta", TMath::Exp( beta ), TMath::Log( dedx ) );
     		book->fill( "dedxP", p, dedx );
     		book->fill( "deltaB", deltaB );
+    		book->fill( "deltaBPi", deltaBPi );
     		book->fill( "deltaBSigPi", deltaB, pico->nSigPi[iHit] );
 
     	}
