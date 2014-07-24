@@ -61,6 +61,7 @@ protected:
 
 	void sHisto( string pType );
 	string sName( string pType, int charge );
+	void speciesReport( string pType );
 
 	double nSigDedx( string pType, int iHit ) { 
 		if ( "P" == pType )

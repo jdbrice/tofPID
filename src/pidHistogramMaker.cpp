@@ -52,6 +52,10 @@ pidHistogramMaker::~pidHistogramMaker() {
 	
 	delete book;
 	delete report;
+	vector<string> parts = config->getStringVector( "pType" );
+	for ( int i = 0; i < parts.size(); i++ ){
+		delete pReport[ parts[ i ] ];
+	}
 	
 	cout << "[pidHistogramMaker.~pidHistogramMaker] " << endl;
 }
@@ -313,7 +317,10 @@ void pidHistogramMaker::make() {
     	
 	} // end loop on events
 
-	
+	// make particle type reports
+	for ( int i = 0; i < parts.size(); i++ ){
+		speciesReport( parts[ i ] );
+	}
 
 
 	cout << "[pidHistogramMaker." << __FUNCTION__ << "] completed in " << elapsed() << " seconds " << endl;
@@ -385,7 +392,34 @@ double pidHistogramMaker::nSigInvBeta( string pType, int iHit  ){
 	return (deltaInvBeta / invBetaSig);
 }
 
-void report
+void pidHistogramMaker::speciesReport( string pType ){
+
+
+	vector<double>pBins = config->getDoubleVector( "binning.pBins" );
+
+	TH3 * h3 = book->get3D( "nSig_" + sName( pType, 0 ) );
+	for ( int i = 0; i < pBins.size(); i ++ ){
+
+		pReport[ pType ]->newPage();
+		h3->GetZaxis()->SetRange( i, i );
+		TH2* proj = (TH2*)h3->Project3D( "xy" );
+
+
+		double pLow = h3->GetZaxis()->GetBinLowEdge( i );
+		double pHi = h3->GetZaxis()->GetBinLowEdge( i + 1 );
+		if ( 0 == i ){
+			pLow = h3->GetZaxis()->GetBinLowEdge( 1 );
+			pHi = h3->GetZaxis()->GetBinLowEdge( pBins.size()-1 );
+		}
+
+		proj->SetTitle( (pType + " : " + ts( pLow ) + "#leq" + "P #leq" + ts( pHi )).c_str()  );
+		proj->Draw( "colz" );
+
+		pReport[ pType ]->savePage();
+
+	}
+
+}
 
 
 
