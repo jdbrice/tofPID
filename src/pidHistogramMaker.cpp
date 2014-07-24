@@ -30,6 +30,13 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	// create the histogram book
 	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config );
 	
+
+
+	vector<string> parts = config->getStringVector( "pType" );
+	for ( int i = 0; i < parts.size(); i++ ){
+		pReport[ parts[ i ] ] = new reporter( config->getString( "output.base" ) + parts[ i ] + config->getString( "output.report" ) );
+	}
+
 	// create a report builder 
 	report = new reporter( config->getString( "output.base" ) + config->getString( "output.report" ) );
 
@@ -378,7 +385,7 @@ double pidHistogramMaker::nSigInvBeta( string pType, int iHit  ){
 	return (deltaInvBeta / invBetaSig);
 }
 
-
+void report
 
 
 

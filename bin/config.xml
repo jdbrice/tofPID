@@ -6,8 +6,8 @@
 	</input>
 	<output>
 		<base></base>
-		<root>qa.root</root>
-		<report>rqa.pdf</report>
+		<root>dqa.root</root>
+		<report>qa.pdf</report>
 	</output>
 
 	<!-- Analysis cuts -->

@@ -39,6 +39,8 @@ private:
 
 	clock_t startTime;
 
+	map< string, reporter * > pReport;
+
 public:
 
 
