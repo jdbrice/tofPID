@@ -29,6 +29,11 @@ public:
 
 	static const Double_t tacToNS = 0.01773; // from bill llope
 
+	static const double piMass = 0.1396;
+	static const double kaonMass = 0.495;
+	static const double protonMass = 0.938272;
+
+
 
 	
 };

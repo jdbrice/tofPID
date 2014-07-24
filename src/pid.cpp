@@ -21,7 +21,7 @@ int main( int argc, char* argv[] ) {
 
     pidHistogramMaker* pid = new pidHistogramMaker( chain, &config  );
 
-    pid->loopEvents();
+    pid->make();
 
     delete pid;
 

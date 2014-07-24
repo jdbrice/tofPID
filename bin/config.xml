@@ -2,7 +2,7 @@
 
 	<input>
 		<rootIn file="qa.root" />
-		<dataDir maxFiles="10" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
+		<dataDir maxFiles="2" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
 	</input>
 	<output>
 		<base></base>
@@ -12,8 +12,8 @@
 
 	<!-- Analysis cuts -->
 	<cut>
-		<central>.05</central>
-		<peripheral>.40</peripheral>
+		
+		<vZ>70</vZ>
 	</cut>
 
 	<!-- histograms -->
@@ -24,10 +24,21 @@
 		<iBeta type="2D" title="1/#beta vs momentum; p [GeV]; 1/#beta"  nBinsX="200" x1="0" x2="3" nBinsY="1000" y1="0" y2="5" />
 		<m2 type="1D" title="M^{2}; M^{2} [GeV^{2}/c^{2}]; N_{Events}"  nBinsX="100" x1="-.4" x2="1.2" draw="h" />
 		<deltaB type="1D" title="#delta#beta^{-1}; #delta#beta^{-1}; N_{Events}"  nBinsX="500" x1="-3" x2="3" draw="h" />
+		<deltaBVsP type="2D" title="#delta#beta^{-1} vs. P; p ; #delta#beta^{-1}"  nBinsX="200" x1="0" x2="3" nBinsY="500" y1="-.2" y2=".2" draw="h" />
+
 		<deltaBPi type="1D" title="#delta#beta^{-1}; #delta#beta^{-1}; N_{Events}"  nBinsX="500" x1="-3" x2="3" draw="h" />
 		<dedxVsBeta type="2D" title="Log(dedx) vs Exp( #beta ); exp( #beta ); log( dedx )" nBinsX="100" x1="1" x2="3" nBinsY="200" y1="0.1" y2="5" />
 		<m2dedx type="2D" title="M^{2} vs Log(dedx); log( dedx ); M^{2} [GeV^{2}/c^{2}]" nBinsX="200" x1="0.1" x2="5" nBinsY="1000" y1="-.2" y2="1.4" />
 		<deltaBSigPi type="2D" title="nSigma #pi vs #Delta#beta" nBinsX="500" x1="-3" x2="3" nBinsY="500" y1="-10" y2="10" />
+
+		<bnSigK type="1D" title="" nBinsX="200" x1="-10" x2="10" />
+		<bnSigKVsP type="2D" title="" nBinsX="200" x1="0" x2="3" nBinsY="200" y1="-10" y2="10" />
+		<bnSigPVsP type="2D" title="" nBinsX="200" x1="0" x2="3" nBinsY="200" y1="-10" y2="10" />
+		<bnSigPiVsP type="2D" title="" nBinsX="200" x1="0" x2="3" nBinsY="200" y1="-10" y2="10" />
+
+		<nSigBetaDedxK type="2D" title="" nBinsX="200" x1="-10" x2="10" nBinsY="200" y1="-10" y2="10" />
+		<nSigBetaDedxP type="2D" title="" nBinsX="200" x1="-10" x2="10" nBinsY="200" y1="-10" y2="10" />
+		<nSigBetaDedxPi type="2D" title="" nBinsX="200" x1="-10" x2="10" nBinsY="200" y1="-10" y2="10" />
 
 	</histo>
 
@@ -36,5 +47,39 @@
 		<log1D draw="h" linecolor="1" logY="2" />
 		<log2D draw="colz" logZ="1" />
 	</style>
+
+	<pType>
+		<v>K</v>
+		<v>P</v>
+		<v>Pi</v>
+	</pType>
+
+	<binning>
+		<nSig nBins="200" min="-15" max="15" />
+		<p nBins="8" min="0" max="4" />
+		
+		<pBins>
+			<v>0</v>
+			<v>0.2</v>
+			<v>0.4</v>
+			<v>0.6</v>
+			<v>0.8</v>
+			<v>1.0</v>
+			<v>1.2</v>
+			<v>1.4</v>
+			<v>1.6</v>
+			<v>1.8</v>
+			<v>2.0</v>
+			<v>2.25</v>
+			<v>2.5</v>
+			<v>2.75</v>
+			<v>3.0</v>
+			<v>3.5</v>
+			<v>4.0</v>
+		</pBins>
+
+		<invBetaSig>0.013</invBetaSig>
+
+	</binning>
 
 </config>

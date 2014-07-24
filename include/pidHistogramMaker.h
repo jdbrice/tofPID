@@ -49,11 +49,38 @@ public:
 	~pidHistogramMaker();
 	
 	void loopEvents();
+	void make();
 
+	TGraph* inverseBeta( double m, double p1, double p2, double step = .05 );
+	
 	
 
 protected:
 
+	void sHisto( string pType );
+	string sName( string pType, int charge );
+
+	double nSigDedx( string pType, int iHit ) { 
+		if ( "P" == pType )
+			return pico->nSigP[ iHit ];
+		if ( "K" == pType )
+			return pico->nSigK[ iHit ];
+		if ( "Pi" == pType )
+			return pico->nSigPi[ iHit ];
+	}
+	double nSigInvBeta( string pType, int iHit  );
+
+	double eBeta( double m, double p ){
+		return TMath::Sqrt( p*p / ( p*p + m*m ) );
+	}
+	double eMass( string pType ){
+		if ( "P" == pType )
+			return constants::protonMass;
+		if ( "K" == pType )
+			return constants::kaonMass;
+		if ( "Pi" == pType )
+			return constants::piMass;	
+	}
 
 	/*
 	*	Utility functions that should be moved soon
