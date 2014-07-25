@@ -2,6 +2,7 @@
 #include "constants.h"
 #include "pidHistogramMaker.h"
 #include "histoBook.h"
+#include "dklMinimizer.h"
 #include <fstream>
 #include <sstream>
 
@@ -28,13 +29,16 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	gStyle->SetOptStat( 0 );
 	
 	// create the histogram book
-	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config );
+	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config, config->getString( "input.root" ) );
 	
 
 
 	vector<string> parts = config->getStringVector( "pType" );
 	for ( int i = 0; i < parts.size(); i++ ){
-		pReport[ parts[ i ] ] = new reporter( config->getString( "output.base" ) + parts[ i ] + config->getString( "output.report" ) );
+		for ( int charge = -1; charge <= 1; charge ++ ){
+			string n = sName( parts[ i ], charge );
+				pReport[ n ] = new reporter( config->getString( "output.base" ) + n + config->getString( "output.report" ) );		
+		}
 	}
 
 	// create a report builder 
@@ -54,7 +58,9 @@ pidHistogramMaker::~pidHistogramMaker() {
 	delete report;
 	vector<string> parts = config->getStringVector( "pType" );
 	for ( int i = 0; i < parts.size(); i++ ){
-		delete pReport[ parts[ i ] ];
+		delete pReport[ sName( parts[ i ], -1 ) ];
+		delete pReport[ sName( parts[ i ], 0 ) ];
+		delete pReport[ sName( parts[ i ], 1 ) ];
 	}
 	
 	cout << "[pidHistogramMaker.~pidHistogramMaker] " << endl;
@@ -244,6 +250,56 @@ TGraph * pidHistogramMaker::inverseBeta( double m, double p1, double p2, double 
 void pidHistogramMaker::make() {
 
 	startTimer();
+/*
+	TH2D* h = new TH2D( "dan", "dan", 30, -15, 15, 30, -15, 15);
+	
+   	for (Int_t i = 0; i < 25000; i++) {
+    	double px = gRandom->Gaus( 0, 1 );
+    	double py = gRandom->Gaus( 0, 1 );
+     	h->Fill( px, py );
+   	}
+   	for (Int_t i = 0; i < 25000; i++) {
+    	double px = gRandom->Gaus( 8, 1 );
+    	double py = gRandom->Gaus( 3, 1 );
+     	h->Fill( px, py, 2 );
+   	}
+
+	dklMinimizer * dkl = new dklMinimizer( h, 2 );
+
+	//dkl->printAll();
+
+	dkl->run( 10000 );
+
+	//dkl->printAll();
+	cout << "iy : " << dkl->inputYield() << endl;
+	cout << "ay : " << dkl->approximationYield() << endl;	
+	cout << "s0y : " << dkl->speciesYield( 0 ) << endl;	
+	cout << "s1y : " << dkl->speciesYield( 1 ) << endl;	
+
+	report->newPage(2, 1);
+	gPad->SetLogz(1);
+	dkl->viewInput( ) ->Draw("colz");
+	report->cd( 2, 1 );
+	gPad->SetLogz(1);
+	dkl->viewApproximation( )->Draw("colz");
+	report->savePage();
+
+	report->newPage(2, 1);
+	gPad->SetLogz(1);
+	dkl->viewSpecies( 0 ) ->Draw("colz");
+	report->cd( 2, 1 );
+	gPad->SetLogz(1);
+	dkl->viewSpecies( 1 ) ->Draw("colz");
+	report->savePage();
+	
+	
+	
+	
+
+
+	return;
+*/
+
 
 	if ( !_chain ){
 		cout << "[pidHistogramMaker." << __FUNCTION__ << "] ERROR: Invalid chain " << endl;
@@ -256,70 +312,74 @@ void pidHistogramMaker::make() {
 	book->cd( "" );
 
 	vector<string> parts = config->getStringVector( "pType" );
-	for ( int i = 0; i < parts.size(); i++ ){
-		sHisto( parts[ i ] );
-	}
 
-	book->make( "nSigBetaDedxK" );
+	if ( !book->get( "nSig_" + sName( parts[ 0 ], 0 ) ) ){
+		for ( int i = 0; i < parts.size(); i++ ){
+			sHisto( parts[ i ] );
+		}
 
+		book->make( "nSigBetaDedxK" );
 
 	
-	// loop over all events
-	for(Int_t i=0; i<nevents; i++) {
-    	_chain->GetEntry(i);
+	
+		// loop over all events
+		for(Int_t i=0; i<nevents; i++) {
+	    	_chain->GetEntry(i);
 
-    	double vz = pico->vertexZ;
-    	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
-    		continue;
-    	
+	    	progressBar( i, nevents, 60 );
 
-    	int nTofHits = pico->nTofHits;
-    	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
-  		
-    		double p = pico->p[ iHit ];
+	    	double vz = pico->vertexZ;
+	    	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
+	    		continue;
+	    	
 
-    		for ( int i = 0; i < parts.size(); i++ ){
-    			string pType = parts[ i ];
-    			
-				int charge = pico->charge[ iHit ];
-				double dedx = nSigDedx( pType, iHit );
-				double invBeta = nSigInvBeta( pType, iHit);
-				
-				if ( "Pi" == pType ){
-					//cout << "nSigPi : " << pico->nSigPi[ iHit ] << endl ;
-					//cout << "nSigPi : " << dedx << endl ;
+	    	int nTofHits = pico->nTofHits;
+	    	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
+	  		
+	    		double p = pico->p[ iHit ];
+
+	    		for ( int i = 0; i < parts.size(); i++ ){
+	    			string pType = parts[ i ];
+	    			
+					int charge = pico->charge[ iHit ];
+					double dedx = nSigDedx( pType, iHit );
+					double invBeta = nSigInvBeta( pType, iHit);
+					
+					
+					if ( p > pMax || p < pMin )
+						continue;
+					if ( dedx > nSigMax || dedx < nSigMin )
+						continue;
+					if ( invBeta > nSigMax || invBeta < nSigMin )
+						continue;
+
+					string name = "nSig_" + sName( pType, charge );
+					TH3* h3 = ((TH3*)book->get( name ));
+					if ( h3 )
+						h3->Fill( dedx, invBeta, p );
+
+					// always fill the both charges histo
+					name = "nSig_" + sName( pType, 0 );
+					h3 = ((TH3*)book->get( name ));
+					if ( h3 )
+						h3->Fill( dedx, invBeta, p );
+
+					if ( "K" == pType ){
+						book->fill( "nSigBetaDedxK", dedx, invBeta );
+
+					}
 				}
-
-				//if ( dedx < 0 )
-				//	cout << "dedx " << endl;
-				//if ( invBeta < 0 )
-				//	cout << "beta " << endl;
-
-
-				string name = "nSig_" + sName( pType, charge );
-				TH3* h3 = ((TH3*)book->get( name ));
-				if ( h3 )
-					h3->Fill( dedx, invBeta, p );
-
-				// always fill the both charges histo
-				name = "nSig_" + sName( pType, 0 );
-				h3 = ((TH3*)book->get( name ));
-				if ( h3 )
-					h3->Fill( dedx, invBeta, p );
-
-				if ( "K" == pType ){
-					book->fill( "nSigBetaDedxK", dedx, invBeta );
-
-				}
-			}
-    		
-    	}
-    	
-	} // end loop on events
+	    		
+	    	}
+	    	
+		} // end loop on events
+	}
 
 	// make particle type reports
 	for ( int i = 0; i < parts.size(); i++ ){
-		speciesReport( parts[ i ] );
+		//speciesReport( parts[ i ], -1 );
+		speciesReport( parts[ i ], 0 );
+		//speciesReport( parts[ i ], 1 );
 	}
 
 
@@ -341,12 +401,13 @@ void pidHistogramMaker::sHisto( string pType ) {
 
 
 	int nSigBins = config->getDouble( "binning.nSig:nBins" );
-	double nSigMin = config->getDouble( "binning.nSig:min" );
-	double nSigMax = config->getDouble( "binning.nSig:max" );
+	nSigMin = config->getDouble( "binning.nSig:min" );
+	nSigMax = config->getDouble( "binning.nSig:max" );
 
-	int nPBins = config->getDouble( "binning.p:nBins" );
-	double pMin = config->getDouble( "binning.p:min" );
-	double pMax = config->getDouble( "binning.p:max" );
+	//int nPBins = config->getDouble( "binning.p:nBins" );
+	
+	pMin = config->getDouble( "binning.p:min" );
+	pMax = config->getDouble( "binning.p:max" );
 
 
 
@@ -365,10 +426,12 @@ void pidHistogramMaker::sHisto( string pType ) {
 
 	vector<double> pBins = config->getDoubleVector( "binning.pBins" );
 
+	string title = "; n#sigma dedx; n#sigma 1/#beta ";
 	// create a combined, plus, and minus
 	for ( int charge = -1; charge <= 1; charge ++ ){
 		string name = "nSig_" + sName( pType, charge );
-		TH3D * h3 = new TH3D( name.c_str(), name.c_str(), 
+
+		TH3D * h3 = new TH3D( name.c_str(), title.c_str(), 
 				nSigBinEdges.size()-1, nSigBinEdges.data(), 
 				nSigBinEdges.size()-1, nSigBinEdges.data(),
 				pBins.size()-1, pBins.data() );
@@ -392,18 +455,24 @@ double pidHistogramMaker::nSigInvBeta( string pType, int iHit  ){
 	return (deltaInvBeta / invBetaSig);
 }
 
-void pidHistogramMaker::speciesReport( string pType ){
+void pidHistogramMaker::speciesReport( string pType, int charge ){
 
-
+	string name = sName( pType, charge );
+	//TCanvas * can = new TCanvas( "can", "can", 800, 800 );
+	//can->Print( "test.pdf[");
 	vector<double>pBins = config->getDoubleVector( "binning.pBins" );
-
-	TH3 * h3 = book->get3D( "nSig_" + sName( pType, 0 ) );
+	bool fitGauss = config->getBool( "pReport.fit1DGauss", false );
+	double fitX1 = config->getDouble( "pReport.fit1DGauss:x1", nSigMin );
+	double fitX2 = config->getDouble( "pReport.fit1DGauss:x2", nSigMax );
+	
+	TH3 * h3 = book->get3D( "nSig_" + name );
 	for ( int i = 0; i < pBins.size(); i ++ ){
 
-		pReport[ pType ]->newPage();
+		pReport[ name ]->newPage( 2, 2 );
+		pReport[ name ]->cd( 1, 2 );
 		h3->GetZaxis()->SetRange( i, i );
-		TH2* proj = (TH2*)h3->Project3D( "xy" );
-
+		TH2* proj;
+		TH1* proj1D;
 
 		double pLow = h3->GetZaxis()->GetBinLowEdge( i );
 		double pHi = h3->GetZaxis()->GetBinLowEdge( i + 1 );
@@ -412,12 +481,98 @@ void pidHistogramMaker::speciesReport( string pType ){
 			pHi = h3->GetZaxis()->GetBinLowEdge( pBins.size()-1 );
 		}
 
-		proj->SetTitle( (pType + " : " + ts( pLow ) + "#leq" + "P #leq" + ts( pHi )).c_str()  );
+		proj = (TH2*)h3->Project3D( "xy" );
+		proj->SetTitle( (pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) ).c_str()  );
+		gPad->SetLogz( 1 );
 		proj->Draw( "colz" );
 
-		pReport[ pType ]->savePage();
+
+		
+		if ( fitGauss ){
+			pReport[ name ]->cd( 2, 1 );
+			proj1D = (TH1D*)h3->Project3D( "x" )->Clone( "fit");
+			proj1D->SetTitle( ("dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) ).c_str()  );
+			gPad->SetLogy( 1 );
+			proj1D->Draw( "h" );
+			TF1 * f1 = new TF1( "g1", "gaus", fitX1, fitX2 );
+			f1->SetRange( fitX1, fitX2 );
+			f1->SetParameter( 1, 0 );
+			proj1D->Fit( f1, "QR", "", fitX1, fitX2 );
+		}
+
+		
+		pReport[ name ]->cd( 2, 2 );
+		proj1D = h3->Project3D( "x" );
+		proj1D->SetTitle( ( "dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) ).c_str()  );
+		proj1D->SetFillColor( kBlue );
+		gPad->SetLogx( 1 );
+		proj1D->Draw( "hbar" );
+
+		//can->Print( "test.pdf" );
+		
+
+		pReport[ name ]->cd( 1, 1 );
+		proj1D = h3->Project3D( "y" );
+		proj1D->SetTitle( ( "1/#beta : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) ).c_str()  );
+		gPad->SetLogy( 1 );
+		proj1D->SetFillColor( kBlue );
+		proj1D->Draw( "" );
+
+		if ( fitGauss ){
+			TF1 * f2 = new TF1( "g2", "gaus", fitX1, fitX2);
+			f2->SetRange( fitX1, fitX2 );
+			//f2->SetParameter( 1, 0.0 );
+			proj1D->Fit( f2, "QR", "", fitX1, fitX2 );
+		}
+
+		pReport[ name ]->savePage();
+
+		if ( pType == config->getString( "dklFit.pType" ) && charge == 0 && i >= config->getInt( "dklFit.pBin:min", 1 ) && i <= config->getInt( "dklFit.pBin:max", 1 )){
+			dklFit( name, (TH2D*)proj );
+		}
 
 	}
+
+	//can->Print( "test.pdf]");
+
+}
+
+
+void pidHistogramMaker::dklFit( string pName, TH2D * h ) {
+
+	dklMinimizer *dkl = new dklMinimizer( h, config->getInt( "dklFit.nSpecies", 1 ) );
+
+	dkl->run( config->getInt( "dklFit.nIterations", 1 ) );
+
+	pReport[ pName ]->newPage( 3, 2 );
+
+	pReport[ pName ]->cd( 1, 1);
+	gPad->SetLogz(1);
+	dkl->viewInput()->Draw("colz");
+
+	pReport[ pName ]->cd( 2, 1);
+	gPad->SetLogz(1);
+	dkl->viewApproximation()->Draw("colz");
+
+	pReport[ pName ]->cd( 1, 2);
+	gPad->SetLogz(1);
+	dkl->viewSpecies( 0 )->Draw("colz");
+
+	if ( config->getInt( "dklFit.nSpecies" ) >= 2 ){
+		pReport[ pName ]->cd( 2, 2);
+		gPad->SetLogz(1);
+		dkl->viewSpecies( 1 )->Draw("colz");
+	}
+
+	if ( config->getInt( "dklFit.nSpecies" ) >= 3 ){
+		pReport[ pName ]->cd( 3, 2);
+		gPad->SetLogz(1);
+		dkl->viewSpecies( 2 )->Draw("colz");
+	}
+
+	pReport[ pName ]->savePage();
+
+
 
 }
 

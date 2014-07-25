@@ -17,6 +17,7 @@
 /bin/*.pdf
 /bin/*.xml
 /bin/pid
+/bin/report/
 # but keep the sample config
 !/bin/config.xml
 

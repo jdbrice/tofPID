@@ -41,6 +41,10 @@ private:
 
 	map< string, reporter * > pReport;
 
+
+	// removing overflows
+	double pMax, pMin, nSigMax, nSigMin;
+
 public:
 
 
@@ -61,7 +65,7 @@ protected:
 
 	void sHisto( string pType );
 	string sName( string pType, int charge );
-	void speciesReport( string pType );
+	void speciesReport( string pType, int charge );
 
 	double nSigDedx( string pType, int iHit ) { 
 		if ( "P" == pType )
@@ -84,6 +88,8 @@ protected:
 		if ( "Pi" == pType )
 			return constants::piMass;	
 	}
+
+	void dklFit( string name, TH2D* h );
 
 	/*
 	*	Utility functions that should be moved soon
