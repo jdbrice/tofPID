@@ -12,30 +12,29 @@
 
 int main( int argc, char* argv[] ) {
 
-  if ( argc >= 2 ){
-    xmlConfig config( argv[ 1 ] );
-    config.report();
+    if ( argc >= 2 ){
+        xmlConfig config( argv[ 1 ] );
+        config.report();
 
+        string jt = config.getString( "jobType" );
+        if ( "histogram" == jt ){
+          
+            TChain * chain = new TChain( "tof" );
+            chainLoader::load( chain, config.getString( "input.dataDir" ).c_str(), config.getInt( "input.dataDir:maxFiles" ) );
 
-    string jt = config.getString( "jobType" );
-    if ( "histogram" == jt ){
-      
-      TChain * chain = new TChain( "tof" );
-      chainLoader::load( chain, config.getString( "input.dataDir" ).c_str(), config.getInt( "input.dataDir:maxFiles" ) );
+            pidHistogramMaker* pid = new pidHistogramMaker( chain, &config  );
+            pid->make();
+            delete pid;
 
-      pidHistogramMaker* pid = new pidHistogramMaker( chain, &config  );
-      pid->make();
-      delete pid;
+        } else if ( "fit" == jt ) {
 
-    } else {
+            pidFitter * pid = new pidFitter( &config );
+            pid->runFit();
+            delete pid;
 
-      
-
+        }
+        
     }
-
-
-
-  }
 
 
 

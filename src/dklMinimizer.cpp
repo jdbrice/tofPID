@@ -2,6 +2,7 @@
 
 #include "dklMinimizer.h"
 #include <time.h> 
+#include "utils.h"
 
 dklMinimizer::dklMinimizer( TH2D* d, uint nSpecies ) {
 	cout << "[dklMinimizer." << __FUNCTION__ << "] " << endl;
@@ -57,13 +58,22 @@ TMatrixD * dklMinimizer::histogramToMatrix( TH2* h ) {
 
 }
 
-TH2 * dklMinimizer::matrixToHistogram( TMatrixD * m, string name ) {
+TH2 * dklMinimizer::matrixToHistogram( TMatrixD * m, string name, double x1, double x2, double y1, double y2 ) {
 	cout << "[dklMinimizer." << __FUNCTION__ << "] " << endl;
 
 	uint rows = m->GetNrows();
 	uint cols = m->GetNcols();
 
-	TH2D * h = new TH2D( name.c_str(), name.c_str(), cols, 0, cols, rows, 0, rows );
+	if ( x1 == x2 ){
+		x1 = 0;
+		x2 = cols;
+	}
+	if ( y1 == y2 ){
+		y1 = 0;
+		y1 = rows;
+	}
+
+	TH2D * h = new TH2D( name.c_str(), name.c_str(), cols, x1, x2, rows, y1, y2 );
 
 	for ( int x = 0; x < cols; x ++ ){
 		for ( int y = 0; y < rows; y ++ ){
@@ -166,9 +176,8 @@ void dklMinimizer::update( ) {
 void dklMinimizer::run( uint nIterations ) {
 
 	for ( uint i = 0; i < nIterations; i++ ){
+		jdbUtils::progressBar( i, nIterations, 60 );
 		update();
-		if ( iCurrent % 1000 == 0 )
-			cout << "[dkl.run] 1000 iterations done : " << iCurrent << endl;
 	}
 
 }
@@ -180,8 +189,8 @@ TMatrixD dklMinimizer::species( uint iSpecies ){
 	TMatrixD  cA = cU * cV;
 	return cA;
 }
-TH2D * dklMinimizer::viewSpecies( uint iSpecies ) {
+TH2D * dklMinimizer::viewSpecies( uint iSpecies, double x1, double x2, double y1, double y2 ) {
 	TMatrixD cA = species( iSpecies );
-	return (TH2D*) matrixToHistogram( &cA, "species" );
+	return (TH2D*) matrixToHistogram( &cA, "species", x1, x2, y1, y2  );
 }
 

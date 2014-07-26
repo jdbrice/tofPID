@@ -17,6 +17,8 @@ public:
 	pidFitter( xmlConfig * config  );
 	~pidFitter();
 
+	void runFit();
+
 protected:
 	// the canvas used to draw report hidtos
 	reporter* report;
@@ -40,9 +42,12 @@ protected:
 
 	string sName( string pType, int charge );
 
-	void runFit();
 	void runDkl( TH2D*, reporter * rp, uint nS, uint nIt );
 
+	void processSpecies( string species, int charge, reporter * rp );
+
+	double squareCut( TH2D * h, string axis, string cut, double value );
+	void makeSquareCuts( TH2D* h, string nodePath );
 
 };
 

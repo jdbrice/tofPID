@@ -5,7 +5,7 @@ project = pid
 source = .cpp 
 # object files to make
 objects = pid.o histoBook.o chainLoader.o pidHistogramMaker.o \
-			reporter.o TOFrPicoDst.o utils.o dklMinimizer.o dklKernelMinimizer.o \
+			reporter.o TOFrPicoDst.o utils.o dklMinimizer.o  \
 			pidFitter.o
 
 sources = $(wildcard *.cpp)

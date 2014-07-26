@@ -18,6 +18,7 @@
 /bin/*.xml
 /bin/pid
 /bin/report/
+/bin/rFit/
 # but keep the sample config
 !/bin/config.xml
 
