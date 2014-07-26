@@ -312,7 +312,7 @@ void histoBook::globalStyle(){
   	gStyle->SetTitleOffset(1.0,"x");
   	gStyle->SetTitleOffset(1.5,"y");
   	gStyle->SetPadTopMargin(0.1);
-  	gStyle->SetPadRightMargin(0.1);
+  	gStyle->SetPadRightMargin(0.15);
   	gStyle->SetPadBottomMargin(0.16);
   	gStyle->SetPadLeftMargin(0.2);
 

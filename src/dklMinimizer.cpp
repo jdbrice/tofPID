@@ -49,7 +49,7 @@ TMatrixD * dklMinimizer::histogramToMatrix( TH2* h ) {
 
 	for ( int x = 0; x < cols; x ++ ){
 		for ( int y = 0; y < rows; y ++ ){
-			(*m)[ y ][ x ] = h->GetBinContent( x, y );
+			(*m)[ y ][ x ] = h->GetBinContent( x+1, y+1 );
 		}
 	}
 
@@ -68,7 +68,7 @@ TH2 * dklMinimizer::matrixToHistogram( TMatrixD * m, string name ) {
 	for ( int x = 0; x < cols; x ++ ){
 		for ( int y = 0; y < rows; y ++ ){
 			double v = (*m)[ y ][ x ];
-			h->SetBinContent( x, y, v );
+			h->SetBinContent( x+1, y+1, v );
 		}
 	}
 	return h;
@@ -121,7 +121,7 @@ inline void dklMinimizer::updateV( ) {
 			for ( int a = 0; a < nRows; a++ ){
 				double vT = (*T)[ a ][ j ];
 				double vA = (*A)[ a ][ j ];
-				double res = (vT / vA );
+				double res = (vT / vA ) ;
 				
 				if ( 0 == vA && 0 == vT )
 					res = 0;

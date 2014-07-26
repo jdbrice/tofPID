@@ -250,55 +250,64 @@ TGraph * pidHistogramMaker::inverseBeta( double m, double p1, double p2, double 
 void pidHistogramMaker::make() {
 
 	startTimer();
-/*
-	TH2D* h = new TH2D( "dan", "dan", 30, -15, 15, 30, -15, 15);
+	/*
+	TH2D* h = new TH2D( "dan", "dan", 50, -10, 40, 50, -10, 40 );
 	
-   	for (Int_t i = 0; i < 25000; i++) {
-    	double px = gRandom->Gaus( 0, 1 );
-    	double py = gRandom->Gaus( 0, 1 );
+   	for (Int_t i = 0; i < 500000; i++) {
+    	double px = gRandom->Gaus( 25, 3 );
+    	double py = gRandom->Gaus( 25, 3 );
      	h->Fill( px, py );
    	}
-   	for (Int_t i = 0; i < 25000; i++) {
-    	double px = gRandom->Gaus( 8, 1 );
-    	double py = gRandom->Gaus( 3, 1 );
-     	h->Fill( px, py, 2 );
+   	for (Int_t i = 0; i < 500000; i++) {
+    	double px = gRandom->Gaus( 15, 3 );
+    	double py = gRandom->Gaus( 15, 3 );
+     	h->Fill( px, py );
+   	}
+   	for (Int_t i = 0; i < 500000; i++) {
+    	double px = gRandom->Gaus( 5, 3 );
+    	double py = gRandom->Gaus( 5, 3 );
+     	h->Fill( px, py );
    	}
 
-	dklMinimizer * dkl = new dklMinimizer( h, 2 );
+
+	dklMinimizer * dkl = new dklMinimizer( h, 3 );
 
 	//dkl->printAll();
 
-	dkl->run( 10000 );
+	dkl->run( 50000 );
 
 	//dkl->printAll();
 	cout << "iy : " << dkl->inputYield() << endl;
 	cout << "ay : " << dkl->approximationYield() << endl;	
 	cout << "s0y : " << dkl->speciesYield( 0 ) << endl;	
 	cout << "s1y : " << dkl->speciesYield( 1 ) << endl;	
+	cout << "s2y : " << dkl->speciesYield( 2 ) << endl;	
 
-	report->newPage(2, 1);
+	report->newPage(1, 2);
 	gPad->SetLogz(1);
 	dkl->viewInput( ) ->Draw("colz");
-	report->cd( 2, 1 );
+	report->cd( 1, 2 );
 	gPad->SetLogz(1);
 	dkl->viewApproximation( )->Draw("colz");
 	report->savePage();
 
-	report->newPage(2, 1);
+	report->newPage(1, 2);
 	gPad->SetLogz(1);
 	dkl->viewSpecies( 0 ) ->Draw("colz");
-	report->cd( 2, 1 );
+	report->cd( 1, 2 );
 	gPad->SetLogz(1);
 	dkl->viewSpecies( 1 ) ->Draw("colz");
 	report->savePage();
-	
-	
-	
-	
 
+	report->newPage(1, 2);
+	gPad->SetLogz(1);
+	dkl->viewSpecies( 2 ) ->Draw("colz");
 
+	report->savePage();
+	
 	return;
-*/
+	*/
+
 
 
 	if ( !_chain ){
@@ -329,7 +338,11 @@ void pidHistogramMaker::make() {
 	    	progressBar( i, nevents, 60 );
 
 	    	double vz = pico->vertexZ;
+	    	int nTof = pico->nTofHits;
+	    	int nT0 = pico->nTZero;
 	    	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
+	    		continue;
+	    	if ( nTof < 10 || nT0 < 10 )
 	    		continue;
 	    	
 
@@ -353,6 +366,16 @@ void pidHistogramMaker::make() {
 					if ( invBeta > nSigMax || invBeta < nSigMin )
 						continue;
 
+					double angle = 0 * ( 3.1415926 / 180 );
+					
+					//double rX = dedx;
+					//double rY = invBeta;
+					double rX = dedx * TMath::Cos( angle ) - invBeta * TMath::Sin( angle );
+					double rY = dedx * TMath::Sin( angle ) + invBeta * TMath::Cos( angle );
+
+					double pR = TMath::Hypot( dedx, invBeta );
+					double pT = TMath::ATan2( invBeta, dedx );
+
 					string name = "nSig_" + sName( pType, charge );
 					TH3* h3 = ((TH3*)book->get( name ));
 					if ( h3 )
@@ -362,7 +385,7 @@ void pidHistogramMaker::make() {
 					name = "nSig_" + sName( pType, 0 );
 					h3 = ((TH3*)book->get( name ));
 					if ( h3 )
-						h3->Fill( dedx, invBeta, p );
+						h3->Fill( rX, rY, p );
 
 					if ( "K" == pType ){
 						book->fill( "nSigBetaDedxK", dedx, invBeta );
@@ -528,7 +551,7 @@ void pidHistogramMaker::speciesReport( string pType, int charge ){
 		pReport[ name ]->savePage();
 
 		if ( pType == config->getString( "dklFit.pType" ) && charge == 0 && i >= config->getInt( "dklFit.pBin:min", 1 ) && i <= config->getInt( "dklFit.pBin:max", 1 )){
-			dklFit( name, (TH2D*)proj );
+			//dklFit( name, (TH2D*)proj );
 		}
 
 	}
@@ -552,22 +575,32 @@ void pidHistogramMaker::dklFit( string pName, TH2D * h ) {
 
 	pReport[ pName ]->cd( 2, 1);
 	gPad->SetLogz(1);
-	dkl->viewApproximation()->Draw("colz");
+	TH2D* ap = dkl->viewApproximation();
+	double min = ap->GetMinimum();
+	double max = ap->GetMaximum();
+	ap->Draw("colz");
 
 	pReport[ pName ]->cd( 1, 2);
 	gPad->SetLogz(1);
-	dkl->viewSpecies( 0 )->Draw("colz");
+
+	TH2D* s1 = dkl->viewSpecies( 0 );
+	s1->GetZaxis()->SetRangeUser( min, max );
+	s1->Draw("colz");
 
 	if ( config->getInt( "dklFit.nSpecies" ) >= 2 ){
 		pReport[ pName ]->cd( 2, 2);
 		gPad->SetLogz(1);
-		dkl->viewSpecies( 1 )->Draw("colz");
+		TH2D* s2 = dkl->viewSpecies( 1 );
+		s2->GetZaxis()->SetRangeUser( min, max );
+		s2->Draw("colz");
 	}
 
 	if ( config->getInt( "dklFit.nSpecies" ) >= 3 ){
 		pReport[ pName ]->cd( 3, 2);
 		gPad->SetLogz(1);
-		dkl->viewSpecies( 2 )->Draw("colz");
+		TH2D* s3 = dkl->viewSpecies( 2 );
+		s3->GetZaxis()->SetRangeUser( min, max );
+		s3->Draw("colz");
 	}
 
 	pReport[ pName ]->savePage();

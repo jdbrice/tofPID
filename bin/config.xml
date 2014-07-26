@@ -2,7 +2,7 @@
 
 	<input>
 		<root file="qa.root" />
-		<dataDir maxFiles="1" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
+		<dataDir maxFiles="200" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
 	</input>
 	<output>
 		<base>report/</base>
@@ -22,17 +22,29 @@
 	</pType>
 
 	<binning>
-		<nSig nBins="40" min="-10" max="10" />
+		<nSig nBins="300" min="-20" max="20" />
 		<p nBins="8" min="0.4" max="4" />
 		
 		<pBins>
 			<v>0.4</v>
-			<v>0.41</v>
+			<v>0.45</v>
 			<v>0.5</v>
+			<v>0.55</v>
 			<v>0.6</v>
+			<v>0.65</v>
+			<v>0.7</v>
+			<v>0.75</v>
 			<v>0.8</v>
+			<v>0.85</v>
+			<v>0.9</v>
+			<v>0.95</v>
 			<v>1.0</v>
+			<v>1.05</v>
+			<v>1.1</v>
+			<v>1.15</v>
 			<v>1.2</v>
+			<v>1.25</v>
+			<v>1.3</v>
 			<v>1.4</v>
 			<v>1.6</v>
 			<v>1.8</v>
@@ -54,9 +66,9 @@
 	</pReport>
 
 	<dklFit>
-		<nSpecies>2</nSpecies>
-		<nIterations>20000</nIterations>
-		<pBin min="12" max="12"/>
+		<nSpecies>3</nSpecies>
+		<nIterations>2500</nIterations>
+		<pBin min="14" max="14"/>
 		<pType>K</pType>
 	</dklFit>
 
