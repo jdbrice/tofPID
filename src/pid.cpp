@@ -17,7 +17,18 @@ int main( int argc, char* argv[] ) {
         config.report();
 
         string jt = config.getString( "jobType" );
-        if ( "histogram" == jt ){
+        
+        if ( "makeQA" == jt ){
+          
+            cout << " Making QA plots " << endl;
+            TChain * chain = new TChain( "tof" );
+            chainLoader::load( chain, config.getString( "input.dataDir" ).c_str(), config.getInt( "input.dataDir:maxFiles" ) );
+
+            pidHistogramMaker* pid = new pidHistogramMaker( chain, &config  );
+            pid->makeQA();
+            delete pid;
+
+        } else if ( "histogram" == jt ){
           
             TChain * chain = new TChain( "tof" );
             chainLoader::load( chain, config.getString( "input.dataDir" ).c_str(), config.getInt( "input.dataDir:maxFiles" ) );

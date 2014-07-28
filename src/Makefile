@@ -6,7 +6,7 @@ source = .cpp
 # object files to make
 objects = pid.o histoBook.o chainLoader.o pidHistogramMaker.o \
 			reporter.o TOFrPicoDst.o utils.o dklMinimizer.o  \
-			pidFitter.o
+			pidFitter.o multiGaussianFit.o
 
 sources = $(wildcard *.cpp)
 headers = $(wildcard ../include/*.h)
@@ -18,7 +18,7 @@ ROOTGLIBS     	= $(shell root-config --glibs)
 
 # Custom Project includes and libs
 includes		= -I../include -I. -I$(ROOTSYS)/include -I$(ROOTDEV)/include 
-libraries 			= 	$(ROOTLIBS) -lGui -lHtml -lGuiHtml $(CERNLIBS) $(SYSLIBS) \
+libraries 			= 	$(ROOTLIBS) -lGui -lHtml -lGuiHtml -lRooFit $(CERNLIBS) $(SYSLIBS) \
 
 cxx 		= g++ -std=c++0x
 flags 		= -Wall -g $(ROOTCFLAGS) $(includes) -Wno-write-strings -m32 -fno-inline

@@ -43,6 +43,7 @@ protected:
 	string sName( string pType, int charge );
 
 	void runDkl( TH2D*, reporter * rp, uint nS, uint nIt );
+	void runMultiGauss( TH2D*, reporter * rp, uint nS );
 
 	void processSpecies( string species, int charge, reporter * rp );
 

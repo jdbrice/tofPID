@@ -19,6 +19,7 @@
 /bin/pid
 /bin/report/
 /bin/rFit/
+/bin/QA/
 # but keep the sample config
 !/bin/config.xml
 

@@ -32,12 +32,14 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config, config->getString( "input.root" ) );
 	
 
-
-	vector<string> parts = config->getStringVector( "pType" );
-	for ( int i = 0; i < parts.size(); i++ ){
-		for ( int charge = -1; charge <= 1; charge ++ ){
-			string n = sName( parts[ i ], charge );
-				pReport[ n ] = new reporter( config->getString( "output.base" ) + n + config->getString( "output.report" ) );		
+	if ( true == config->nodeExists( "pType" )  ){
+		vector<string> parts = config->getStringVector( "pType" );
+		cout << "parts: " << parts.size() << endl;
+		for ( int i = 0; i < parts.size(); i++ ){
+			for ( int charge = -1; charge <= 1; charge ++ ){
+				string n = sName( parts[ i ], charge );
+					pReport[ n ] = new reporter( config->getString( "output.base" ) + n + config->getString( "output.report" ) );		
+			}
 		}
 	}
 
@@ -56,11 +58,14 @@ pidHistogramMaker::~pidHistogramMaker() {
 	
 	delete book;
 	delete report;
-	vector<string> parts = config->getStringVector( "pType" );
-	for ( int i = 0; i < parts.size(); i++ ){
-		delete pReport[ sName( parts[ i ], -1 ) ];
-		delete pReport[ sName( parts[ i ], 0 ) ];
-		delete pReport[ sName( parts[ i ], 1 ) ];
+
+	if ( true == config->nodeExists( "pType" )  ){
+		vector<string> parts = config->getStringVector( "pType" );
+		for ( int i = 0; i < parts.size(); i++ ){
+			delete pReport[ sName( parts[ i ], -1 ) ];
+			delete pReport[ sName( parts[ i ], 0 ) ];
+			delete pReport[ sName( parts[ i ], 1 ) ];
+		}
 	}
 	
 	cout << "[pidHistogramMaker.~pidHistogramMaker] " << endl;
@@ -68,9 +73,11 @@ pidHistogramMaker::~pidHistogramMaker() {
 
 
 
-void pidHistogramMaker::loopEvents() {
+void pidHistogramMaker::makeQA() {
 
 	startTimer();
+
+	gStyle->SetOptStat( 11 );
 
 	if ( !_chain ){
 		cout << "[pidHistogramMaker." << __FUNCTION__ << "] ERROR: Invalid chain " << endl;
@@ -86,20 +93,47 @@ void pidHistogramMaker::loopEvents() {
 
 	book->makeAll( "histo" );
 	
+
+	double vOffsetX = config->getDouble( "cut.vOffset:x", 0 );
+	double vOffsetY = config->getDouble( "cut.vOffset:y", 0 );
 	
 	// loop over all events
 	for(Int_t i=0; i<nevents; i++) {
     	_chain->GetEntry(i);
 
     	double vz = pico->vertexZ;
+    	double vx = pico->vertexX;
+    	double vy = pico->vertexY;
+    	double vr = TMath::Sqrt( vx*vx + vy*vy );
+    	double vrOff = TMath::Sqrt( (vx - vOffsetX)*(vx - vOffsetX) + (vy - vOffsetY)*(vy - vOffsetY) );
+    	
+    	// Vertex distributions before any cuts
+    	book->fill( "preVz", vz );
+
+    	book->fill( "preOffsetVr", vr );
+    	book->fill( "preOffsetVxy", vx, vy);
+
+    	// with the x,y brought back to 0
+    	book->fill( "preVr", vrOff );
+    	book->fill( "preVxy", vx - vOffsetX, vy - vOffsetY);
+
+		if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) ){
+			book->fill( "postVz", vz );
+		}
+		if (  vrOff < config->getDouble( "cut.vR", 10 ) ){
+			book->fill( "postVr", vrOff );
+			book->fill( "postVxy", vx - vOffsetX, vy - vOffsetY );
+		}    	
+    	
+
     	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
     		continue;
+
 
     	double tStart = pico->tStart;
     	Int_t refMult = pico->refMult;
 
-    	
-
+    
     	int nTofHits = pico->nTofHits;
     	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
 
@@ -149,6 +183,32 @@ void pidHistogramMaker::loopEvents() {
     	}
     	
 	} // end loop on events
+
+	report->newPage( 1, 2);
+	book->style( "preVz" )->set( "style.1D" )->draw();
+	report->next();
+	book->style( "postVz" )->set( "style.1D" )->draw();
+	report->savePage();
+
+	report->newPage( 2, 2);
+	book->style( "preOffsetVr" )->set( "style.1D" )->draw();
+	report->next();
+	book->style( "preVr" )->set( "style.1D" )->draw();
+	report->next();
+	book->style( "postVr" )->set( "style.1D" )->draw();
+	report->savePage();
+
+	report->newPage( 2, 2);
+	gStyle->SetOptStat( 1111 );
+	book->style( "preOffsetVxy" )->set( "style.log2D" )->draw();
+	report->next();
+	book->style( "preVxy" )->set( "style.log2D" )->draw();
+	report->next();
+	book->style( "postVxy" )->set( "style.log2D" )->draw();
+	report->savePage();
+	gStyle->SetOptStat( 11 );
+
+
 
 	report->newPage();
 	book->style("iBeta")->set( "style.log2D" )->draw();

@@ -54,7 +54,7 @@ public:
 	// destructor
 	~pidHistogramMaker();
 	
-	void loopEvents();
+	void makeQA();
 	void make();
 
 	TGraph* inverseBeta( double m, double p1, double p2, double step = .05 );

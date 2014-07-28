@@ -2,7 +2,8 @@
 
 #include "pidFitter.h"
 #include "dklMinimizer.h"
-#define sDelete(x) {delete x; x = NULL;}
+#include "multiGaussianFit.h"
+
 
 // provides my own string shortcuts etc.
 using namespace jdbUtils;
@@ -116,9 +117,9 @@ void pidFitter::runDkl( TH2D* h, reporter * rp, uint nS, uint nIt ){
 
 	rp->savePage();
 
-	sDelete( s1 );
-	sDelete( s2 );
-	sDelete( s3 );
+	//sDelete( s1 );
+	//sDelete( s2 );
+	//sDelete( s3 );
 }
 
 
@@ -175,9 +176,39 @@ void pidFitter::processSpecies( string species, int charge, reporter * rp ){
 		// now fit using the dkl algorithm
 		runDkl( cut, rp, config->getInt( nodePath + ".dkl:nSpecies", 1 ), config->getInt( nodePath + ".dkl:nRuns", 10 ) );
 
-
+		// runs the 2d gaussian fit
+		//runMultiGauss( cut, rp, config->getInt( nodePath + ".mgf:nSpecies", 1 ) );
 		
 	}
+}
+
+void pidFitter::runMultiGauss( TH2D* h, reporter* rp, uint nS ){
+
+	double axisMin = config->getDouble( "binning.nSig:min", 0 );
+	double axisMax = config->getDouble( "binning.nSig:max", 0 );
+
+	multiGaussianFit * mgf = new multiGaussianFit( h, nS );
+	mgf->setX( "dedx",  axisMin, axisMax );
+	mgf->setY( "invBeta",  axisMin, axisMax );
+
+	
+	mgf->fit();
+
+	
+	rp->newPage();
+	RooPlot* frame = mgf->viewFitX();
+	//cout << "drawing" << endl;
+	//RooPlot * frame = mgf->getX()->frame(  );
+	//cout << "drawing" << endl;
+	//mgf->getFit()->plotOn( frame );
+	cout << "drawing" << endl;
+	//frame->Draw();
+	gPad->SetLogz(1);
+	rp->savePage();
+	delete frame;
+
+	delete mgf;
+
 }
 
 
