@@ -52,22 +52,34 @@ void multiGaussianFit::setupModel() {
 	for ( uint iS = 0; iS < nSpecies; iS++ ){
 
 		// create the mean for X and Y observables
+		double mX = 0;
+		if ( initialMeanX.size() > iS )
+			mX = initialMeanX[ iS ];
+		double mMinX = xMin, mMaxX = xMax;
+		if ( meanMinX.size() > iS && meanMaxX.size() > iS ){
+			mMinX = meanMinX[ iS ];
+			mMaxX = meanMaxX[ iS ];
+		}
+		cout << "Mean X " << mX << " in ( " << mMinX << " -> " << mMaxX << " ) " << endl;
 		RooRealVar *mx = new RooRealVar( 	("meanX" + ts(iS) ).c_str(), ("meanX" + ts(iS) ).c_str(),
-											0, xMin, xMax );
+											mX, mMinX, mMaxX );
 		meanX.push_back( mx );
 
+		double mY = 0;
+		if ( initialMeanY.size() > iS )
+			mY = initialMeanY[ iS ];
 		RooRealVar *my = new RooRealVar( 	("meanY" + ts(iS) ).c_str(), ("meanY" + ts(iS) ).c_str(),
-											0, yMin, yMax );
+											mY, yMin, yMax );
 		meanY.push_back( my );
 		
 		// create the sigma for X and Y gaussians
 		RooRealVar *sx = new RooRealVar( 	("sigX" + ts(iS) ).c_str(), ("sigX" + ts(iS) ).c_str(),
-											5, 1, 20 );
+											.005, 0.0001, .02 );
 		sigX.push_back( sx );
 
 		RooRealVar *sy = new RooRealVar( 	("sigY" + ts(iS) ).c_str(), ("sigY" + ts(iS) ).c_str(),
 											5, 1, 20 );
-		sigX.push_back( sy );
+		sigY.push_back( sy );
 		
 		// create the gaussians
 		RooGaussian * gx = new RooGaussian( ("gaussX" + ts(iS) ).c_str(), ("gaussX" + ts(iS) ).c_str(),

@@ -57,6 +57,53 @@ public:
 		return frame;
 	}
 
+	void setInitialMean( double x, double y ){
+		initialMeanX.push_back( x );
+		initialMeanY.push_back( y );
+	}
+	void limitMeanX( double x1, double x2 ){
+		meanMinX.push_back( x1 );
+		meanMaxX.push_back( x2 );
+	}
+	void limitMeanY( double y1, double y2 ){
+		meanMinY.push_back( y1 );
+		meanMaxY.push_back( y2 );
+	}
+
+	double getMeanX( uint iS ){
+		if ( iS < nSpecies )
+			return meanX[ iS ]->getVal();
+	}
+	double getMeanY( uint iS ){
+		if ( iS < nSpecies )
+			return meanY[ iS ]->getVal();
+	}
+	double getMeanXError( uint iS ){
+		if ( iS < nSpecies )
+			return meanX[ iS ]->getError();
+	}
+	double getMeanYError( uint iS ){
+		if ( iS < nSpecies )
+			return meanY[ iS ]->getError();
+	}
+
+	double getSigmaX( uint iS ){
+		if ( iS < nSpecies )
+			return sigX[ iS ]->getVal();
+	}
+	double getSigmaY( uint iS ){
+		if ( iS < nSpecies )
+			return sigY[ iS ]->getVal();
+	}
+	double getSigmaXError( uint iS ){
+		if ( iS < nSpecies )
+			return sigX[ iS ]->getError();
+	}
+	double getSigmaYError( uint iS ){
+		if ( iS < nSpecies )
+			return sigY[ iS ]->getError();
+	}
+
 protected:
 
 	RooAddPdf * gxy;
@@ -66,6 +113,13 @@ protected:
 	uint nSpecies;
 	double xMin, xMax;
 	double yMin, yMax;
+
+	vector<double> initialMeanX;
+	vector<double> initialMeanY;
+	vector<double> meanMinX;
+	vector<double> meanMinY;
+	vector<double> meanMaxX;
+	vector<double> meanMaxY;
 
 	RooDataHist * rdh;
 

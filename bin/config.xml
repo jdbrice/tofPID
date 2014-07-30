@@ -1,8 +1,9 @@
 <config>
 
+	<jobType>histogram</jobType>
 	<input>
 		<root file="qa.root" />
-		<dataDir maxFiles="200" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
+		<dataDir maxFiles="100" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
 	</input>
 	<output>
 		<base>report/</base>
@@ -13,6 +14,10 @@
 	<!-- Analysis cuts -->
 	<cut>		
 		<vZ>70</vZ>
+		<vR>1.0</vR>
+		<nT0>20.0</nT0>
+		<nTof>20.0</nTof>
+		<vOffset x="0" y="-.86" />
 	</cut>
 
 	<pType>
@@ -22,7 +27,9 @@
 	</pType>
 
 	<binning>
-		<nSig nBins="300" min="-20" max="20" />
+		<nSig nBins="300" min="-15" max="15" />
+		<deltaBeta nBins="300" min="-.15" max=".15" />
+		<nSigPolar nBinsR="100" minR="-.2" maxR=".2" nBinsT="100" minT="-10" maxT="10" />
 		<p nBins="8" min="0.4" max="4" />
 		
 		<pBins>
@@ -46,6 +53,7 @@
 			<v>1.25</v>
 			<v>1.3</v>
 			<v>1.4</v>
+			<v>1.5</v>
 			<v>1.6</v>
 			<v>1.8</v>
 			<v>2.0</v>
@@ -67,8 +75,8 @@
 
 	<dklFit>
 		<nSpecies>3</nSpecies>
-		<nIterations>2500</nIterations>
-		<pBin min="14" max="14"/>
+		<nIterations>5000</nIterations>
+		<pBin min="-1" max="-1"/>
 		<pType>K</pType>
 	</dklFit>
 

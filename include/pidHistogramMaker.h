@@ -44,6 +44,10 @@ private:
 
 	// removing overflows
 	double pMax, pMin, nSigMax, nSigMin;
+	double dBetaMax, dBetaMin;
+
+	//QA memebers
+	double vOffsetX, vOffsetY;
 
 public:
 
@@ -59,6 +63,8 @@ public:
 
 	TGraph* inverseBeta( double m, double p1, double p2, double step = .05 );
 	
+	bool keepEventQA();
+	bool keepTrackQA( uint iHit );
 	
 
 protected:
@@ -76,6 +82,7 @@ protected:
 			return pico->nSigPi[ iHit ];
 	}
 	double nSigInvBeta( string pType, int iHit  );
+	double dBeta( string pType, int iHit  );
 
 	double eBeta( double m, double p ){
 		return TMath::Sqrt( p*p / ( p*p + m*m ) );

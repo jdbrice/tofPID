@@ -25,6 +25,7 @@ protected:
 
 	// the histobook that stores all of our pidHistogramMaker histograms
 	histoBook *book;
+	histoBook *lutBook;
 
 	// config file
 	xmlConfig* config;
@@ -42,8 +43,8 @@ protected:
 
 	string sName( string pType, int charge );
 
-	void runDkl( TH2D*, reporter * rp, uint nS, uint nIt );
-	void runMultiGauss( TH2D*, reporter * rp, uint nS );
+	void runDkl( TH2D*, reporter * rp, string optPath );
+	void runMultiGauss( TH2D*, reporter * rp, string nodePath, uint pBin );
 
 	void processSpecies( string species, int charge, reporter * rp );
 

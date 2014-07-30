@@ -332,7 +332,6 @@ histoBook* histoBook::style( string histName ){
 		set( configPath[histName] + ".style" );
 	} else if ( config && config->nodeExists( configPath[ histName ] + ":style" ) && config->nodeExists( config->getString( configPath[ histName ] + ":style" ) ) ){
 		set( config->getString( configPath[ histName ] + ":style" ) );
-		cout << "hello " << endl;
 	}
 
 	return this;
@@ -381,7 +380,7 @@ histoBook* histoBook::set( xmlConfig* config, string nodePath ){
 	vector< pair< string, string > > list = config->getAttributes( nodePath );
 
 	for ( int i = 0; i < list.size(); i++ ){
-
+		
 		vector<string> params = config->split( list[ i ].second, ',' );
 		for ( int p = 0; p < params.size(); p++ ){
 			params[ p ] = config->trim(params[ p ]);

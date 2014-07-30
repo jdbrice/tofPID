@@ -34,7 +34,7 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 
 	if ( true == config->nodeExists( "pType" )  ){
 		vector<string> parts = config->getStringVector( "pType" );
-		cout << "parts: " << parts.size() << endl;
+		
 		for ( int i = 0; i < parts.size(); i++ ){
 			for ( int charge = -1; charge <= 1; charge ++ ){
 				string n = sName( parts[ i ], charge );
@@ -49,6 +49,10 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 
 	_chain = chain;
 	pico = new TOFrPicoDst( _chain );
+
+
+	vOffsetX = config->getDouble( "cut.vOffset:x", 0 );
+	vOffsetY = config->getDouble( "cut.vOffset:y", 0 );
 }
 
 /**
@@ -75,6 +79,9 @@ pidHistogramMaker::~pidHistogramMaker() {
 
 void pidHistogramMaker::makeQA() {
 
+
+	
+
 	startTimer();
 
 	gStyle->SetOptStat( 11 );
@@ -93,13 +100,16 @@ void pidHistogramMaker::makeQA() {
 
 	book->makeAll( "histo" );
 	
-
-	double vOffsetX = config->getDouble( "cut.vOffset:x", 0 );
-	double vOffsetY = config->getDouble( "cut.vOffset:y", 0 );
 	
 	// loop over all events
 	for(Int_t i=0; i<nevents; i++) {
     	_chain->GetEntry(i);
+
+    	progressBar( i, nevents, 60 );
+
+    	int nT0 = pico->nTZero;
+    	int nTofHits = pico->nTofHits;
+    	
 
     	double vz = pico->vertexZ;
     	double vx = pico->vertexX;
@@ -107,6 +117,11 @@ void pidHistogramMaker::makeQA() {
     	double vr = TMath::Sqrt( vx*vx + vy*vy );
     	double vrOff = TMath::Sqrt( (vx - vOffsetX)*(vx - vOffsetX) + (vy - vOffsetY)*(vy - vOffsetY) );
     	
+    	// nHits QA
+    	book->fill( "nTZero", nT0 );
+    	book->fill( "nTofHits", nTofHits );
+    	//book->fill( "nHits", nHits );
+
     	// Vertex distributions before any cuts
     	book->fill( "preVz", vz );
 
@@ -117,16 +132,28 @@ void pidHistogramMaker::makeQA() {
     	book->fill( "preVr", vrOff );
     	book->fill( "preVxy", vx - vOffsetX, vy - vOffsetY);
 
-		if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) ){
+		if ( TMath::Abs( vz ) < config->getDouble( "cut.vZ", 30 ) ){
 			book->fill( "postVz", vz );
+			book->fill( "postVrCutVz", vrOff );
 		}
 		if (  vrOff < config->getDouble( "cut.vR", 10 ) ){
 			book->fill( "postVr", vrOff );
 			book->fill( "postVxy", vx - vOffsetX, vy - vOffsetY );
-		}    	
+		}  
+		if ( TMath::Abs( vz ) < config->getDouble( "cut.vZ", 30 ) && vrOff < config->getDouble( "cut.vR", 10 ) ){
+			book->fill( "postVzCutVzVr", vz );	
+			book->fill( "postVrCutVzVr", vrOff );	
+		}  	
+		if ( nT0 > config->getDouble( "cut.nT0", 0 ) ){
+			book->fill( "postNTZero", nT0 );
+		}
+    	if ( nTofHits > config->getDouble( "cut.nTof", 0 ) ){
+    		book->fill( "postNTofHits", nTofHits );
+    	}
+
     	
 
-    	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
+    	if ( !keepEventQA() )
     		continue;
 
 
@@ -134,11 +161,20 @@ void pidHistogramMaker::makeQA() {
     	Int_t refMult = pico->refMult;
 
     
-    	int nTofHits = pico->nTofHits;
     	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
+
+
+    		book->fill( "nHits", pico->nHits[ iHit ] );
+    		book->fill( "nHitsFit", pico->nHitsFit[ iHit ] );
+    		book->fill( "nHitsPossible", pico->nHitsPossible[ iHit ] );
+
+
+    		if ( !keepTrackQA( iHit ) )
+    			continue;
 
     		//if ( abs( pico->nSigPi[ iHit ] ) > 2 )
     		//	continue;
+    		
 
     		double le = pico->leTime[ iHit ];
     		double length = pico->length[ iHit ];
@@ -150,26 +186,31 @@ void pidHistogramMaker::makeQA() {
     		
     		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
     		double deltaB = 1 - beta * TMath::Sqrt( 1 - m2 / ( p*p )  );
-    		double deltaBPi = 1 - beta * TMath::Sqrt( 1 - (.139*.139) / ( p*p ) );
+    		//double deltaBPi = 1 - beta * TMath::Sqrt( 1 - (.139*.139) / ( p*p ) );
 
-    		double deltaBKaon = 1 - (beta) * TMath::Sqrt( 1 - (.009*.009) / ( p*p ) );
+    		double deltaBPi = 1 - (beta) * TMath::Sqrt( (constants::piMass*constants::piMass) / (p*p) + 1 );
+    		double deltaBK = 1 - (beta) * TMath::Sqrt( (constants::kaonMass*constants::kaonMass) / (p*p) + 1 );
 
     		double sigIBeta = 0.013;
     		double bnSigK = ((1.0/beta) - (1.0 / eBeta( constants::kaonMass, p ) )) / sigIBeta ;
     		double bnSigP = ((1.0/beta) - (1.0 / eBeta( constants::protonMass, p ) )) / sigIBeta ;
     		double bnSigPi = ((1.0/beta) - (1.0 / eBeta( constants::piMass, p ) )) / sigIBeta ;
     		
+    		book->fill( "m2", m2 );
     		book->fill( "m2p", p, m2 );
     		book->fill( "m2dedx", TMath::Log(dedx), m2 );
-    		book->fill( "m2", m2 );
-    		book->fill( "iBeta", p, (1.0/beta) );
-    		book->fill( "dedxVsBeta", TMath::Exp( beta ), TMath::Log( dedx ) );
+    		
     		book->fill( "dedxP", p, dedx );
+    		book->fill( "iBeta", p, (1.0/beta) );
+
+    		book->fill( "dedxVsBeta", TMath::Exp( beta ), TMath::Log( dedx ) );
+
+    		
     		book->fill( "deltaB", deltaB );
     		book->fill( "deltaBPi", deltaBPi );
     		book->fill( "deltaBSigPi", deltaB, pico->nSigPi[iHit] );
 
-    		book->fill( "deltaBVsP", p, deltaBKaon );
+    		//book->fill( "deltaBVsP", p, deltaBKaon );
 
     		book->fill( "bnSigK", bnSigK );
     		book->fill( "bnSigKVsP", p, bnSigK );
@@ -180,106 +221,131 @@ void pidHistogramMaker::makeQA() {
     		book->fill( "nSigBetaDedxP", pico->nSigP[iHit], bnSigP );
     		book->fill( "nSigBetaDedxPi", pico->nSigPi[iHit], bnSigPi );
 
+    		if ( p < 1.15 && p > 1.049 ){
+    			book->fill( "deltaBSigPi", deltaBPi, pico->nSigPi[ iHit ] );
+    			book->fill( "deltaBSigK", deltaBK, pico->nSigK[ iHit ] );
+    		}
+
     	}
     	
 	} // end loop on events
 
-	report->newPage( 1, 2);
-	book->style( "preVz" )->set( "style.1D" )->draw();
+	report->newPage( 2, 2);
+	book->style( "nTZero" )->draw();
 	report->next();
-	book->style( "postVz" )->set( "style.1D" )->draw();
+	book->style( "nTofHits" )->draw();
+	report->next();
+	book->style( "postNTZero" )->draw();
+	report->next();
+	book->style( "postNTofHits" )->draw();
 	report->savePage();
 
 	report->newPage( 2, 2);
-	book->style( "preOffsetVr" )->set( "style.1D" )->draw();
+	book->style( "preVz" )->draw();
 	report->next();
-	book->style( "preVr" )->set( "style.1D" )->draw();
+	book->style( "postVz" )->draw();
 	report->next();
-	book->style( "postVr" )->set( "style.1D" )->draw();
+	book->style( "postVzCutVzVr" )->draw();
 	report->savePage();
 
 	report->newPage( 2, 2);
-	gStyle->SetOptStat( 1111 );
-	book->style( "preOffsetVxy" )->set( "style.log2D" )->draw();
+	book->style( "preVr" )->draw();
 	report->next();
-	book->style( "preVxy" )->set( "style.log2D" )->draw();
+	book->style( "postVrCutVz" )->draw();
 	report->next();
-	book->style( "postVxy" )->set( "style.log2D" )->draw();
+	book->style( "postVr" )->draw();
+	report->next();
+	book->style( "postVrCutVzVr" )->draw();
+	report->savePage();
+
+	report->newPage( 2, 2);
+	gStyle->SetOptStat( 111 );
+	book->style( "preOffsetVxy" )->draw();
+	report->next();
+	book->style( "preVxy" )->draw();
+	report->next();
+	book->style( "postVxy" )->draw();
 	report->savePage();
 	gStyle->SetOptStat( 11 );
 
 
+	report->newPage( 2, 2 );
+	book->style( "nHits" )->draw();
+	report->next();
+	book->style( "nHitsFit" )->draw();
+	report->next();
+	book->style( "nHitsPossible" )->draw();
+	report->savePage();
 
 	report->newPage();
-	book->style("iBeta")->set( "style.log2D" )->draw();
+	book->style("iBeta")->draw();
 
 	TGraph * g1 = inverseBeta( constants::piMass, 0.15, 3, .05 );
 	TGraph * g2 = inverseBeta( constants::kaonMass, 0.15, 3, .05 );
 	TGraph * g3 = inverseBeta( constants::protonMass, 0.15, 3, .05 );
+	TGraph * g4 = inverseBeta( constants::eMass, 0.15, 3, .05 );
 	g1->Draw( "same" );
 	g2->Draw( "same" );
 	g3->Draw( "same" );
+	g4->Draw( "same" );
 	report->savePage();
 
-	report->newPage();
-	book->style("bnSigK")->draw();
+	report->newPage( 1, 2);
+	book->style("dedxP")->draw();
+	report->next();
+	book->style("dedxVsBeta")->draw();
 	report->savePage();
 
-	report->newPage();
-	book->style("bnSigKVsP")->set( "style.log2D" )->draw();
+	report->newPage( 2, 2);
+	book->style("m2")->draw();
+	report->next();
+	book->style("m2p")->draw();
+	report->next();
+	book->style("m2dedx")->draw();
 	report->savePage();
 
-	report->newPage();
-	book->style("bnSigPVsP")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("bnSigPiVsP")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("nSigBetaDedxK")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("nSigBetaDedxP")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("nSigBetaDedxPi")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	
-
-
-	/*report->newPage();
-	book->style("iBeta")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("m2dedx")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("dedxVsBeta")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("dedxP")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("deltaBSigPi")->set( "style.log2D" )->draw();
-	report->savePage();
-
-	report->newPage();
-	book->style("m2")->set( "style.log1D" )->draw();
-	report->savePage();*/
 
 
 	cout << "[pidHistogramMaker." << __FUNCTION__ << "] completed in " << elapsed() << " seconds " << endl;
 }
 
+bool pidHistogramMaker::keepEventQA(){
+
+
+	double vz = pico->vertexZ;
+	double vx = pico->vertexX;
+	double vy = pico->vertexY;
+	double vr = TMath::Sqrt( vx*vx + vy*vy );
+	double vrOff = TMath::Sqrt( (vx - vOffsetX)*(vx - vOffsetX) + (vy - vOffsetY)*(vy - vOffsetY) );
+
+	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
+    	return false;
+    if (  vrOff > config->getDouble( "cut.vR", 10 ) )
+    	return false;
+
+    int nT0 = pico->nTZero;
+    int nTofHits = pico->nTofHits;
+
+    if ( nT0 < config->getDouble( "cut.nT0", 0 ) )
+    	return false;
+    if ( nTofHits < config->getDouble( "cut.nTof", 0 ) )
+    	return false;
+
+
+    return true;
+}
+
+bool pidHistogramMaker::keepTrackQA( uint iHit ){
+
+	double p = pico->p[ iHit ];
+	double nHits = pico->nHits[ iHit ];
+	double eta = pico->eta[ iHit ];
+
+	if ( TMath::Abs( eta ) > .20 )
+		return false;
+
+	return true;
+}
 
 
 TGraph * pidHistogramMaker::inverseBeta( double m, double p1, double p2, double step ){
@@ -386,10 +452,6 @@ void pidHistogramMaker::make() {
 		for ( int i = 0; i < parts.size(); i++ ){
 			sHisto( parts[ i ] );
 		}
-
-		book->make( "nSigBetaDedxK" );
-
-	
 	
 		// loop over all events
 		for(Int_t i=0; i<nevents; i++) {
@@ -397,17 +459,15 @@ void pidHistogramMaker::make() {
 
 	    	progressBar( i, nevents, 60 );
 
-	    	double vz = pico->vertexZ;
-	    	int nTof = pico->nTofHits;
-	    	int nT0 = pico->nTZero;
-	    	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
-	    		continue;
-	    	if ( nTof < 10 || nT0 < 10 )
+	    	if ( !keepEventQA() )
 	    		continue;
 	    	
 
 	    	int nTofHits = pico->nTofHits;
 	    	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
+
+	    		if ( !keepTrackQA( iHit ) )
+		    		continue;
 	  		
 	    		double p = pico->p[ iHit ];
 
@@ -417,40 +477,42 @@ void pidHistogramMaker::make() {
 					int charge = pico->charge[ iHit ];
 					double dedx = nSigDedx( pType, iHit );
 					double invBeta = nSigInvBeta( pType, iHit);
+					double deltaB = dBeta( pType, iHit );
 					
 					
 					if ( p > pMax || p < pMin )
 						continue;
 					if ( dedx > nSigMax || dedx < nSigMin )
 						continue;
-					if ( invBeta > nSigMax || invBeta < nSigMin )
+					if ( deltaB > dBetaMax || deltaB < dBetaMin )
 						continue;
 
-					double angle = 0 * ( 3.1415926 / 180 );
+					//double angle = 0 * ( 3.1415926 / 180 );
 					
 					//double rX = dedx;
 					//double rY = invBeta;
-					double rX = dedx * TMath::Cos( angle ) - invBeta * TMath::Sin( angle );
-					double rY = dedx * TMath::Sin( angle ) + invBeta * TMath::Cos( angle );
+					//double rX = dedx * TMath::Cos( angle ) - invBeta * TMath::Sin( angle );
+					//double rY = dedx * TMath::Sin( angle ) + invBeta * TMath::Cos( angle );
 
-					double pR = TMath::Hypot( dedx, invBeta );
-					double pT = TMath::ATan2( invBeta, dedx );
+					//double pR = TMath::Hypot( dedx+5, invBeta+5 );
+					//double pT = TMath::ATan2( invBeta+5, dedx+5 );
+					
 
 					string name = "nSig_" + sName( pType, charge );
+					
 					TH3* h3 = ((TH3*)book->get( name ));
-					if ( h3 )
-						h3->Fill( dedx, invBeta, p );
+					
+					if ( h3 ){
+						h3->Fill( dedx, deltaB, p );
+					}
 
 					// always fill the both charges histo
 					name = "nSig_" + sName( pType, 0 );
 					h3 = ((TH3*)book->get( name ));
-					if ( h3 )
-						h3->Fill( rX, rY, p );
-
-					if ( "K" == pType ){
-						book->fill( "nSigBetaDedxK", dedx, invBeta );
-
+					if ( h3 ){
+						h3->Fill( dedx, deltaB, p );
 					}
+
 				}
 	    		
 	    	}
@@ -487,14 +549,23 @@ void pidHistogramMaker::sHisto( string pType ) {
 	nSigMin = config->getDouble( "binning.nSig:min" );
 	nSigMax = config->getDouble( "binning.nSig:max" );
 
+	int dBetaBins = config->getDouble( "binning.deltaBeta:nBins" );
+	dBetaMin = config->getDouble( "binning.deltaBeta:min" );
+	dBetaMax = config->getDouble( "binning.deltaBeta:max" );
+
+/*
+	int nSigBinsR = config->getDouble( "binning.nSigPolar:nBinsR" );
+	double nSigMinR = config->getDouble( "binning.nSigPolar:minR" );
+	double nSigMaxR = config->getDouble( "binning.nSigPolar:maxR" );
+
+	int nSigBinsT = config->getDouble( "binning.nSigPolar:nBinsT" );
+	double nSigMinT = config->getDouble( "binning.nSigPolar:minT" );
+	double nSigMaxT = config->getDouble( "binning.nSigPolar:maxT" );
+*/
 	//int nPBins = config->getDouble( "binning.p:nBins" );
 	
 	pMin = config->getDouble( "binning.p:min" );
 	pMax = config->getDouble( "binning.p:max" );
-
-
-
-
 
 	// make the nsigma bins
 	double step = (nSigMax - nSigMin ) / nSigBins;
@@ -504,27 +575,77 @@ void pidHistogramMaker::sHisto( string pType ) {
 	}
 	nSigBinEdges.push_back( nSigMax );
 
+	// make the delta beta bins
+	double stepB = (dBetaMax - dBetaMin ) / dBetaBins;
+	vector<double>dBetaBinEdges;
+	for ( double i = dBetaMin; i < dBetaMax; i += stepB ){
+		dBetaBinEdges.push_back( i );
+	}
+	dBetaBinEdges.push_back( dBetaMax );
 
+/*
+	double stepR = (nSigMaxR - nSigMinR ) / nSigBinsR;
+
+	vector<double>nSigBinEdgesR;
+	for ( double i = nSigMinR; i < nSigMaxR; i += stepR ){
+		nSigBinEdgesR.push_back( i );
+	}
+	nSigBinEdgesR.push_back( nSigMaxR );
+	
+	double stepT = (nSigMaxT - nSigMinT ) / nSigBinsT;
+	vector<double>nSigBinEdgesT;
+	for ( double i = nSigMinT; i < nSigMaxT; i += stepT ){
+		nSigBinEdgesT.push_back( i );
+	}
+	nSigBinEdgesT.push_back( nSigMaxT );
+*/
+	
 	//vector<double> ppBins = { 0, .5, 1.0, 1.5, 2.0, 2.25, 3, 4 };
 
 	vector<double> pBins = config->getDoubleVector( "binning.pBins" );
 
 	string title = "; n#sigma dedx; n#sigma 1/#beta ";
+	//string titlePolar = "; r; #theta ";
 	// create a combined, plus, and minus
 	for ( int charge = -1; charge <= 1; charge ++ ){
 		string name = "nSig_" + sName( pType, charge );
+		//string polar = "nSigPolar_" + sName( pType, charge );
 
 		TH3D * h3 = new TH3D( name.c_str(), title.c_str(), 
 				nSigBinEdges.size()-1, nSigBinEdges.data(), 
-				nSigBinEdges.size()-1, nSigBinEdges.data(),
+				dBetaBinEdges.size()-1, dBetaBinEdges.data(),
 				pBins.size()-1, pBins.data() );
 
 		book->add( name, h3 );
+
+		/*TH3D * p3 = new TH3D( polar.c_str(), titlePolar.c_str(), 
+				nSigBinEdgesR.size()-1, nSigBinEdgesR.data(), 
+				nSigBinEdgesT.size()-1, nSigBinEdgesT.data(),
+				pBins.size()-1, pBins.data() );
+
+		book->add( polar, p3 );*/
 	}
 
 
 }
+double pidHistogramMaker::dBeta( string pType, int iHit ){
 
+	double tof = pico->tof[ iHit ];
+	double length = pico->length[ iHit ];
+	double p = pico->p[ iHit ];
+	double beta = pico->beta[ iHit ];
+	double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
+
+
+	double deltaB = 1 - (beta) * TMath::Sqrt( (constants::kaonMass*constants::kaonMass) / (p*p) + 1 );
+
+	if ( "Pi" == pType )
+		deltaB = 1 - (beta) * TMath::Sqrt( (constants::piMass*constants::piMass) / (p*p) + 1 );		
+	if ( "P" == pType )
+		deltaB = 1 - (beta) * TMath::Sqrt( (constants::protonMass*constants::protonMass) / (p*p) + 1 );		
+	
+	return deltaB;
+}
 
 double pidHistogramMaker::nSigInvBeta( string pType, int iHit  ){
 
@@ -539,7 +660,7 @@ double pidHistogramMaker::nSigInvBeta( string pType, int iHit  ){
 }
 
 void pidHistogramMaker::speciesReport( string pType, int charge ){
-
+	cout << " Species Report : " << sName( pType, charge ) << endl;
 	string name = sName( pType, charge );
 	//TCanvas * can = new TCanvas( "can", "can", 800, 800 );
 	//can->Print( "test.pdf[");
@@ -547,13 +668,18 @@ void pidHistogramMaker::speciesReport( string pType, int charge ){
 	bool fitGauss = config->getBool( "pReport.fit1DGauss", false );
 	double fitX1 = config->getDouble( "pReport.fit1DGauss:x1", nSigMin );
 	double fitX2 = config->getDouble( "pReport.fit1DGauss:x2", nSigMax );
-	
+	uint nBinsP = pBins.size();
+
 	TH3 * h3 = book->get3D( "nSig_" + name );
-	for ( int i = 0; i < pBins.size(); i ++ ){
+	
+	for ( uint i = 0; i < nBinsP; i ++ ){
+
+		progressBar( i, nBinsP, 60 );
 
 		pReport[ name ]->newPage( 2, 2 );
 		pReport[ name ]->cd( 1, 2 );
 		h3->GetZaxis()->SetRange( i, i );
+		
 		TH2* proj;
 		TH1* proj1D;
 
@@ -607,11 +733,12 @@ void pidHistogramMaker::speciesReport( string pType, int charge ){
 			//f2->SetParameter( 1, 0.0 );
 			proj1D->Fit( f2, "QR", "", fitX1, fitX2 );
 		}
+		
 
 		pReport[ name ]->savePage();
 
 		if ( pType == config->getString( "dklFit.pType" ) && charge == 0 && i >= config->getInt( "dklFit.pBin:min", 1 ) && i <= config->getInt( "dklFit.pBin:max", 1 )){
-			//dklFit( name, (TH2D*)proj );
+			dklFit( name, (TH2D*)proj );
 		}
 
 	}
