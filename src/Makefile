@@ -19,10 +19,10 @@ ROOTGLIBS     	= $(shell root-config --glibs)
 
 # Custom Project includes and libs
 includes		= -I../include -I. -I$(ROOTSYS)/include -I$(ROOTDEV)/include 
-libraries 			= 	$(ROOTLIBS) -lGui -lHtml -lGuiHtml -lRooFit $(CERNLIBS) $(SYSLIBS) \
+libraries 			= 	$(ROOTLIBS) -lGui -lHtml -lGuiHtml -lRooFitCore -lRooFit $(CERNLIBS) $(SYSLIBS) \
 
 cxx 		= g++ -std=c++0x
-flags 		= -Wall -g $(ROOTCFLAGS) $(includes) -Wno-write-strings -fno-inline
+flags 		= -Wall -g $(ROOTCFLAGS) $(includes) -Wno-write-strings 
 compile 	= $(cxx) $(flags) -c 
 ldFlags  	= $(ROOTLDFLAGS) -g
 

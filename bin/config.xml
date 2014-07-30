@@ -3,7 +3,7 @@
 	<jobType>histogram</jobType>
 	<input>
 		<root file="qa.root" />
-		<dataDir maxFiles="100" >/star/institutions/rice/jdb/run14/auau15/rcp/data/output/</dataDir>
+		<dataDir maxFiles="10" >/Users/danielbrandenburg/bnl/local/data/auau15Rcp/</dataDir>
 	</input>
 	<output>
 		<base>report/</base>
@@ -30,9 +30,12 @@
 		<nSig nBins="300" min="-15" max="15" />
 		<deltaBeta nBins="300" min="-.15" max=".15" />
 		<nSigPolar nBinsR="100" minR="-.2" maxR=".2" nBinsT="100" minT="-10" maxT="10" />
-		<p nBins="8" min="0.4" max="4" />
+		<p nBins="8" min="0.2" max="4" />
 		
 		<pBins>
+			<v>0.2</v>
+			<v>0.3</v>
+			<v>0.35</v>
 			<v>0.4</v>
 			<v>0.45</v>
 			<v>0.5</v>
