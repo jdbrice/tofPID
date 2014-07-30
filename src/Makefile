@@ -13,6 +13,7 @@ headers = $(wildcard ../include/*.h)
 
 # ROOT libs and includes
 ROOTCFLAGS    	= $(shell root-config --cflags)
+ROOTLDFLAGS    	= $(shell root-config --ldflags)
 ROOTLIBS      	= $(shell root-config --libs)
 ROOTGLIBS     	= $(shell root-config --glibs)
 
@@ -21,9 +22,9 @@ includes		= -I../include -I. -I$(ROOTSYS)/include -I$(ROOTDEV)/include
 libraries 			= 	$(ROOTLIBS) -lGui -lHtml -lGuiHtml -lRooFit $(CERNLIBS) $(SYSLIBS) \
 
 cxx 		= g++ -std=c++0x
-flags 		= -Wall -g $(ROOTCFLAGS) $(includes) -Wno-write-strings -m32 -fno-inline
+flags 		= -Wall -g $(ROOTCFLAGS) $(includes) -Wno-write-strings -fno-inline
 compile 	= $(cxx) $(flags) -c 
-ldFlags  	= -m32 -g
+ldFlags  	= $(ROOTLDFLAGS) -g
 
 all: $(project)
 
