@@ -3,13 +3,17 @@
 	<jobType>histogram</jobType>
 	<input>
 		<root file="qa.root" />
-		<dataDir maxFiles="10" >/Users/danielbrandenburg/bnl/local/data/auau15Rcp/</dataDir>
+		<dataDir maxFiles="400" >/Users/danielbrandenburg/bnl/local/data/auau15Rcp/</dataDir>
 	</input>
 	<output>
 		<base>report/</base>
 		<root>dqa.root</root>
 		<report>qa.pdf</report>
 	</output>
+	<statBox>
+		<pos x="0.85" y="0.9" />
+		<show>11</show>
+	</statBox>
 
 	<!-- Analysis cuts -->
 	<cut>		
@@ -67,6 +71,14 @@
 			<v>3.5</v>
 			<v>4.0</v>
 		</pBins>
+
+		<eta>
+			<v>0.2</v>
+			<v>0.4</v>
+			<v>0.6</v>
+			<v>0.8</v>
+			<v>1.0</v>
+		</eta>
 
 		<invBetaSig>0.013</invBetaSig>
 

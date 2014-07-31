@@ -22,7 +22,7 @@ void multiGaussianFit::fit() {
 	cout << "[multiGaussianFit." << __FUNCTION__ << "]" << endl;
 	setupModel();
 
-	model->fitTo( (*rdh) );
+	model->fitTo( (*rdh), RooFit::PrintLevel(-1) );
 	
 
 	//RooGaussian gx("gx","gx",*xObs,RooFit::RooConst(-2),RooFit::RooConst(3)) ;

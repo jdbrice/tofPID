@@ -43,18 +43,20 @@ public:
 	RooAddPdf * getFit(){
 		return model;
 	}
-	RooPlot * viewFitX(){
+	void viewFitX( string title = "" ){
 		RooPlot * frame = xObs->frame(  );
-		//rdh->plotOn( frame ); //DataError( RooAbsData::SumW2 )
+		
 		TH2* h = xObs->createHistogram( "rooData", *yObs, 0, 0, 0, 0);
 		rdh->fillHistogram( h, RooArgList( *xObs, *yObs) );
 		
 		TH2* h2 = xObs->createHistogram( "rooModel", *yObs, 0, 0, 0, 0);
 		model->fillHistogram( h2, RooArgList( *xObs, *yObs) );
+		
+		if ( "" != title )
+			h->SetTitle( title.c_str() );
 		h->Draw("colz");
 		h2->Draw("cont2 same");
-		//frame->Draw();
-		return frame;
+		
 	}
 
 	void setInitialMean( double x, double y ){

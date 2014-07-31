@@ -11,7 +11,7 @@ using namespace jdbUtils;
 pidFitter::pidFitter( xmlConfig * con ){
 	cout << "[pidFitter.pidFitter] " << endl;
 	
-	gErrorIgnoreLevel=kError;
+	gErrorIgnoreLevel=kSysError;
 
 	config = con;
 
@@ -156,7 +156,7 @@ void pidFitter::runFit(){
 	lutBook->makeAll( "hist" );
 
 	book->cd("");
-	processSpecies( "K", 0, report );
+	processSpecies( "Pi", 0, report );
 	//processSpecies( "Pi", 0, report );
 
 }
@@ -208,7 +208,7 @@ void pidFitter::processSpecies( string species, int charge, reporter * rp ){
 			// draw the distribution after square cuts
 			rp->cd( 1, 2 );
 			gPad->SetLogz( 1 );
-			cut->SetTitle( ( "After Square Cuts : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) ).c_str()  );
+			cut->SetTitle( ( "After 1D Cuts : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) ).c_str()  );
 			cut->Draw( "colz" );
 			rp->savePage( );
 
@@ -217,7 +217,7 @@ void pidFitter::processSpecies( string species, int charge, reporter * rp ){
 				runDkl( cut, rp, optPath );
 			// runs the 2d gaussian fit
 			else if ( config->nodeExists( optPath + ".mgf" ) )
-				runMultiGauss( cut, rp, optPath, i );
+				runMultiGauss( cut, rp, species, optPath, i );
 			
 			
 		}
@@ -227,7 +227,7 @@ void pidFitter::processSpecies( string species, int charge, reporter * rp ){
 	
 }
 
-void pidFitter::runMultiGauss( TH2D* h, reporter* rp, string nodePath, uint pBin ){
+void pidFitter::runMultiGauss( TH2D* h, reporter* rp, string pType, string nodePath, uint pBin ){
 
 	h->Sumw2();
 	uint nS = config->getInt( nodePath + ".mgf:nSpecies", 1 );
@@ -236,8 +236,8 @@ void pidFitter::runMultiGauss( TH2D* h, reporter* rp, string nodePath, uint pBin
 	double axisMax = config->getDouble( "binning.nSig:max", 0 );
 
 	multiGaussianFit * mgf = new multiGaussianFit( h, nS );
-	mgf->setX( "dedx",  axisMin, axisMax );
-	mgf->setY( "invBeta",  axisMin, axisMax );
+	mgf->setX( "#Delta#beta^{-1}/#beta^{-1}",  axisMin, axisMax );
+	mgf->setY( "n#sigma dedx",  axisMin, axisMax );
 
 	for ( int i = 1; i < nS + 1; i ++ ){
 
@@ -256,23 +256,22 @@ void pidFitter::runMultiGauss( TH2D* h, reporter* rp, string nodePath, uint pBin
 	mgf->fit();
 
 	lutBook->cd("");
-	lutBook->get( "xMeanPi" )->SetBinContent( pBin, mgf->getMeanX( 0 ) );
-	lutBook->get( "xMeanPi" )->SetBinError( pBin, mgf->getMeanXError( 0 ) );
-	lutBook->get( "yMeanPi" )->SetBinContent( pBin, mgf->getMeanY( 0 ) );
-	lutBook->get( "yMeanPi" )->SetBinError( pBin, mgf->getMeanYError( 0 ) );
+	lutBook->get( "xMean" + pType )->SetBinContent( pBin, mgf->getMeanX( 0 ) );
+	lutBook->get( "xMean" + pType )->SetBinError( pBin, mgf->getMeanXError( 0 ) );
+	lutBook->get( "yMean" + pType )->SetBinContent( pBin, mgf->getMeanY( 0 ) );
+	lutBook->get( "yMean" + pType )->SetBinError( pBin, mgf->getMeanYError( 0 ) );
 
 	// sigmas
-	lutBook->get( "xSigmaPi" )->SetBinContent( pBin, mgf->getSigmaX( 0 ) );
-	lutBook->get( "xSigmaPi" )->SetBinError( pBin, mgf->getSigmaXError( 0 ) );
-	lutBook->get( "ySigmaPi" )->SetBinContent( pBin, mgf->getSigmaY( 0 ) );
-	lutBook->get( "ySigmaPi" )->SetBinError( pBin, mgf->getSigmaYError( 0 ) );
+	lutBook->get( "xSigma" + pType )->SetBinContent( pBin, mgf->getSigmaX( 0 ) );
+	lutBook->get( "xSigma" + pType )->SetBinError( pBin, mgf->getSigmaXError( 0 ) );
+	lutBook->get( "ySigma" + pType )->SetBinContent( pBin, mgf->getSigmaY( 0 ) );
+	lutBook->get( "ySigma" + pType )->SetBinError( pBin, mgf->getSigmaYError( 0 ) );
 
 	
 	rp->newPage();
-	RooPlot* frame = mgf->viewFitX();
+	mgf->viewFitX( "Fit");
 	gPad->SetLogz(1);
 	rp->savePage();
-	delete frame;
 
 	delete mgf;
 

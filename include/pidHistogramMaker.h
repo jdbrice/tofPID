@@ -71,7 +71,7 @@ protected:
 
 	void sHisto( string pType );
 	string sName( string pType, int charge );
-	void speciesReport( string pType, int charge );
+	void speciesReport( string pType, int charge, int etaBin = -1 );
 
 	double nSigDedx( string pType, int iHit ) { 
 		if ( "P" == pType )
@@ -80,6 +80,7 @@ protected:
 			return pico->nSigK[ iHit ];
 		if ( "Pi" == pType )
 			return pico->nSigPi[ iHit ];
+		return -999.0;
 	}
 	double nSigInvBeta( string pType, int iHit  );
 	double dBeta( string pType, int iHit  );
@@ -93,7 +94,8 @@ protected:
 		if ( "K" == pType )
 			return constants::kaonMass;
 		if ( "Pi" == pType )
-			return constants::piMass;	
+			return constants::piMass;
+		return -10.0;	
 	}
 
 	void dklFit( string name, TH2D* h );
