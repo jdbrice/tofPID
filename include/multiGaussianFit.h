@@ -75,35 +75,43 @@ public:
 	double getMeanX( uint iS ){
 		if ( iS < nSpecies )
 			return meanX[ iS ]->getVal();
+		return -999.999;
 	}
 	double getMeanY( uint iS ){
 		if ( iS < nSpecies )
 			return meanY[ iS ]->getVal();
+		return -999.999;
 	}
 	double getMeanXError( uint iS ){
 		if ( iS < nSpecies )
 			return meanX[ iS ]->getError();
+		return -999.999;
 	}
 	double getMeanYError( uint iS ){
 		if ( iS < nSpecies )
 			return meanY[ iS ]->getError();
+		return -999.999;
 	}
 
 	double getSigmaX( uint iS ){
 		if ( iS < nSpecies )
 			return sigX[ iS ]->getVal();
+		return -999.999;
 	}
 	double getSigmaY( uint iS ){
 		if ( iS < nSpecies )
 			return sigY[ iS ]->getVal();
+		return -999.999;
 	}
 	double getSigmaXError( uint iS ){
 		if ( iS < nSpecies )
 			return sigX[ iS ]->getError();
+		return -999.999;
 	}
 	double getSigmaYError( uint iS ){
 		if ( iS < nSpecies )
 			return sigY[ iS ]->getError();
+		return -999.999;
 	}
 
 protected:
