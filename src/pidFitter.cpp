@@ -167,7 +167,7 @@ void pidFitter::processSpecies( string species, int charge, reporter * rp ){
 
 	string hName = "nSig_" + sName( species, charge );
 	// get the pt Binning
-	vector<double>pBins = config->getDoubleVector( "binning.pBins" );
+	vector<double>pBins = config->getDoubleVector( "binning.p" );
 
 	string useNode = "";
 

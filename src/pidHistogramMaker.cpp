@@ -233,6 +233,8 @@ void pidHistogramMaker::makeQA() {
     			book->fill( "deltaBSigK", deltaBK, pico->nSigK[ iHit ] );
     		}
 
+  
+
     	}
     	
 	} // end loop on events
@@ -284,7 +286,7 @@ void pidHistogramMaker::makeQA() {
 	book->style( "nHitsPossible" )->draw();
 	report->savePage();
 
-	report->newPage();
+	report->newPage(1, 2);
 	book->style("iBeta")->draw();
 
 	TGraph * g1 = inverseBeta( constants::piMass, 0.15, 3, .05 );
