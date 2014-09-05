@@ -192,6 +192,11 @@ void pidHistogramMaker::makeQA() {
     		double dedx = pico->dedx[ iHit ];
     		
     		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
+
+    		// mass cut?
+    		//if ( TMath::Abs(m2 - constants::kaonMass*constants::kaonMass) > .1 )
+    		//	continue;
+
     		double deltaB = 1 - beta * TMath::Sqrt( 1 - m2 / ( p*p )  );
     		//double deltaBPi = 1 - beta * TMath::Sqrt( 1 - (.139*.139) / ( p*p ) );
 
@@ -497,7 +502,6 @@ void pidHistogramMaker::make() {
 	for ( int i = 0; i < parts.size(); i++ ){
 		//speciesReport( parts[ i ], -1 );
 		speciesReport( parts[ i ], 0 );
-		//speciesReport( parts[ i ], 0, 0 );
 		//speciesReport( parts[ i ], 1 );
 	}
 
