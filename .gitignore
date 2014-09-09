@@ -17,7 +17,7 @@
 /bin/*.pdf
 /bin/*.xml
 /bin/pid
-/bin/report/
+/bin/histogram/
 /bin/rFit/
 /bin/QA/
 # but keep the sample config

@@ -9,6 +9,8 @@
 // provides my own string shortcuts etc.
 using namespace jdbUtils;
 
+const string pidHistogramMaker::inverseBeta = "inverseBeta";
+const string pidHistogramMaker::deltaBeta = "deltaBeta";
 
 /**
  * Constructor - Initializes all of the pidHistogram parameters from the configuration file
@@ -34,9 +36,6 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	
 	// create the histogram book
 	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config, config->getString( "input.root" ) );
-	
-	vector<double> etaBins = config->getDoubleVector( "binning.eta" );
-	int nEta = etaBins.size();
 
 	if ( true == config->nodeExists( "pType" )  ){
 		vector<string> parts = config->getStringVector( "pType" );
@@ -44,7 +43,7 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 		for ( int i = 0; i < parts.size(); i++ ){
 			for ( int charge = -1; charge <= 1; charge ++ ){
 
-				string n = sName( parts[ i ], charge );
+				string n = speciesName( parts[ i ], charge );
 				pReport[ n ] = new reporter( config->getString( "output.base" ) + n + config->getString( "output.report" ) );		
 			}
 		}
@@ -60,6 +59,8 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 
 	vOffsetX = config->getDouble( "cut.vOffset:x", 0 );
 	vOffsetY = config->getDouble( "cut.vOffset:y", 0 );
+
+	inverseBetaSigma = config->getDouble( "binning.invBetaSigma", 0.012 );
 }
 
 /**
@@ -73,16 +74,14 @@ pidHistogramMaker::~pidHistogramMaker() {
 	if ( true == config->nodeExists( "pType" )  ){
 		vector<string> parts = config->getStringVector( "pType" );
 		for ( int i = 0; i < parts.size(); i++ ){
-			delete pReport[ sName( parts[ i ], -1 ) ];
-			delete pReport[ sName( parts[ i ], 0 ) ];
-			delete pReport[ sName( parts[ i ], 1 ) ];
+			delete pReport[ speciesName( parts[ i ], -1 ) ];
+			delete pReport[ speciesName( parts[ i ], 0 ) ];
+			delete pReport[ speciesName( parts[ i ], 1 ) ];
 		}
 	}
 	
 	cout << "[pidHistogramMaker.~pidHistogramMaker] " << endl;
 }
-
-
 
 void pidHistogramMaker::makeQA() {
 
@@ -294,10 +293,10 @@ void pidHistogramMaker::makeQA() {
 	report->newPage(1, 2);
 	book->style("iBeta")->draw();
 
-	TGraph * g1 = inverseBeta( constants::piMass, 0.15, 3, .05 );
-	TGraph * g2 = inverseBeta( constants::kaonMass, 0.15, 3, .05 );
-	TGraph * g3 = inverseBeta( constants::protonMass, 0.15, 3, .05 );
-	TGraph * g4 = inverseBeta( constants::eMass, 0.15, 3, .05 );
+	TGraph * g1 = inverseBetaGraph( constants::piMass, 0.15, 3, .05 );
+	TGraph * g2 = inverseBetaGraph( constants::kaonMass, 0.15, 3, .05 );
+	TGraph * g3 = inverseBetaGraph( constants::protonMass, 0.15, 3, .05 );
+	TGraph * g4 = inverseBetaGraph( constants::eMass, 0.15, 3, .05 );
 	g1->Draw( "same" );
 	g2->Draw( "same" );
 	g3->Draw( "same" );
@@ -362,7 +361,7 @@ bool pidHistogramMaker::keepTrackQA( uint iHit ){
 }
 
 
-TGraph * pidHistogramMaker::inverseBeta( double m, double p1, double p2, double step ){
+TGraph * pidHistogramMaker::inverseBetaGraph( double m, double p1, double p2, double step ){
 
 	if ( p1 <= 0 )
 		p1 = 0.01;
@@ -387,7 +386,9 @@ TGraph * pidHistogramMaker::inverseBeta( double m, double p1, double p2, double 
 }
 
 
-void pidHistogramMaker::make() {
+
+
+void pidHistogramMaker::makePidHistograms() {
 
 	startTimer();
 
@@ -403,94 +404,69 @@ void pidHistogramMaker::make() {
 
 	vector<string> parts = config->getStringVector( "pType" );
 
-	vector<double> etaBins = config->getDoubleVector( "binning.eta" );
-	int nEta = etaBins.size();
-
 	for ( int i = 0; i < parts.size(); i++ ){
-		sHisto( parts[ i ] );
+		prepareHistograms( parts[ i ] );
 	}
 
-	// loop over all events
+	// loop over all events to produce the histograms
 	for(Int_t i=0; i<nevents; i++) {
     	_chain->GetEntry(i);
 
+    	// report progress
     	progressBar( i, nevents, 60 );
 
+    	// use the QA event cuts
     	if ( !keepEventQA() )
     		continue;
     	
-
+    	// Loop over all tof hits
     	int nTofHits = pico->nTofHits;
     	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
 
+    		// Use the QA Track cuts
     		if ( !keepTrackQA( iHit ) )
 	    		continue;
   		
     		double p = pico->p[ iHit ];
 
+    		// compute centered distributions for each particle type
     		for ( int i = 0; i < parts.size(); i++ ){
     			string pType = parts[ i ];
     			
+    			// collect variables 
 				int charge = pico->charge[ iHit ];
 				double eta = pico->eta[ iHit ];
 				double dedx = nSigDedx( pType, iHit );
+				
+				// Configuration allows you to choose between these two metrics
 				double invBeta = nSigInvBeta( pType, iHit);
 				double deltaB = dBeta( pType, iHit );
+				double tof = invBeta;
+				if ( tofMetric == deltaBeta )
+					tof = deltaB;
 				
-				
+				// check the limits so we dont process more than we need to
 				if ( p > pMax || p < pMin )
 					continue;
-				if ( dedx >= nSigMax || dedx <= nSigMin )
+				if ( dedx >= dedxMax || dedx <= dedxMin )
 					continue;
-				if ( deltaB >= dBetaMax || deltaB <= dBetaMin )
+				if ( deltaB >= tofMax || deltaB <= tofMin )
 					continue;
 
-				//double angle = 0 * ( 3.1415926 / 180 );
-				
-				//double rX = dedx;
-				//double rY = invBeta;
-				//double rX = dedx * TMath::Cos( angle ) - invBeta * TMath::Sin( angle );
-				//double rY = dedx * TMath::Sin( angle ) + invBeta * TMath::Cos( angle );
-
-				//double pR = TMath::Hypot( dedx+5, invBeta+5 );
-				//double pT = TMath::ATan2( invBeta+5, dedx+5 );
-				
-
-				string name = "nSig_" + sName( pType, charge );
-				
+				// get and fill the histogram for this pType and charge
+				string name = "nSig_" + speciesName( pType, charge );
 				TH3* h3 = ((TH3*)book->get( name ));
-				
 				if ( h3 ){
-					h3->Fill( dedx, deltaB, p );
+					h3->Fill( dedx, tof, p );
 				}
 
-				// always fill the both charges histo
-				name = "nSig_" + sName( pType, 0 );
+				// always fill the charge agnostic histogram
+				name = "nSig_" + speciesName( pType, 0 );
 				h3 = ((TH3*)book->get( name ));
 				if ( h3 ){
-					h3->Fill( dedx, deltaB, p );
+					h3->Fill( dedx, tof, p );
 				}
-
-				for ( int iEta = 0; iEta < nEta; iEta++ ){
-					double etaHigh = etaBins[ iEta ];
-					double etaLow = 0.0;
-
-
-					if ( iEta >= 1 )
-						etaLow = etaBins[ iEta - 1];
-
-					if ( TMath::Abs( eta ) >= etaLow && TMath::Abs( eta ) < etaHigh ){
-						
-						name = "nSig_" + sName( pType, 0 ) + "_eta" + ts( iEta);
-						
-						h3 = book->get3D( name );
-						if ( h3 ){
-							h3->Fill( dedx, deltaB, p );
-						}
-
-					}
-
-				} // loop over the eta bins
+			
 
 			} // loop pTypes
     		
@@ -509,138 +485,101 @@ void pidHistogramMaker::make() {
 	cout << "[pidHistogramMaker." << __FUNCTION__ << "] completed in " << elapsed() << " seconds " << endl;
 }
 
-string pidHistogramMaker::sName( string pType, int charge ){
+string pidHistogramMaker::speciesName( string pType, int charge ){
 
 	if ( -1 == charge )
 		return pType + "_Negative";
 	if ( 1 == charge )
 		return pType + "_Positive";
 	if ( 0 == charge )
-		return pType + "_All";
+		return pType + "";
 	return "";
 }
 
-void pidHistogramMaker::sHisto( string pType ) {
+void pidHistogramMaker::prepareHistograms( string pType ) {
+	cout << "[pidHistogramMaker." << __FUNCTION__ << "] Center Species : " << pType << endl;
 
+	/**
+	 * Make the dedx binning 
+	 */
+	double dedxBinWidth = config->getDouble( "binning.dedx:binWidth" );
+	dedxMin = config->getDouble( "binning.dedx:min" );
+	dedxMax = config->getDouble( "binning.dedx:max" );
 
-	int nSigBins = config->getDouble( "binning.nSig:nBins" );
-	nSigMin = config->getDouble( "binning.nSig:min" );
-	nSigMax = config->getDouble( "binning.nSig:max" );
-
-	int dBetaBins = config->getDouble( "binning.deltaBeta:nBins" );
-	dBetaMin = config->getDouble( "binning.deltaBeta:min" );
-	dBetaMax = config->getDouble( "binning.deltaBeta:max" );
-
-	vector<double> etaBins = config->getDoubleVector( "binning.eta" );
+	for ( double i = dedxMin; i <= dedxMax; i += dedxBinWidth ){
+		dedxBins.push_back( i );
+	}
 	
-	
+	cout << "\tDedx bins created" << endl;
+
+	/**
+	 * Make the Tof Binning
+	 * could be for either 1/beta of delta 1/beta 
+	 */
+	tofMetric = config->getString( "binning.tofMetric", "inverseBeta" );
+	double tofBinWidth = config->getDouble( "binning.tof:binWidth" );
+	tofMin = config->getDouble( "binning.tof:min" );
+	tofMax = config->getDouble( "binning.tof:max" );
+
+	for ( double i = tofMin; i <= tofMax; i += tofBinWidth ){
+		tofBins.push_back( i );
+	}
+	cout << "\tTof bins created" << endl;
+
+
+	/**
+	 * Make the momentum binning
+	 */
 	pMin = config->getDouble( "binning.p:min" );
 	pMax = config->getDouble( "binning.p:max" );
 
-	// make the nsigma bins
-	double step = (nSigMax - nSigMin ) / nSigBins;
-	vector<double>nSigBinEdges;
-	for ( double i = nSigMin; i < nSigMax; i += step ){
-		nSigBinEdges.push_back( i );
+	if ( config->nodeExists( "binning.pBins" ) && config->getDoubleVector( "binning.pBins" ).size() >= 2 ){
+		pBins = config->getDoubleVector( "binning.pBins" );
+			
+		pMin = pBins[ 0 ];
+		pMax = pBins[ pBins.size() - 1 ];
+	} else {
+		// build the pBins from the range and binWidth
+		double pBinWidth = config->getDouble( "binning.p:binWidth", .05 );
+		for ( double i = pMin; i <= pMax; i+= pBinWidth ){
+			pBins.push_back( i );
+		}
 	}
-	nSigBinEdges.push_back( nSigMax );
-
-	// make the delta beta bins
-	double stepB = (dBetaMax - dBetaMin ) / dBetaBins;
-	vector<double>dBetaBinEdges;
-	for ( double i = dBetaMin; i < dBetaMax; i += stepB ){
-		dBetaBinEdges.push_back( i );
-	}
-	dBetaBinEdges.push_back( dBetaMax );
+	cout << "\tMomentum bins created" << endl;
 
 
+	string title = "";
 
-	vector<double> pBins = config->getDoubleVector( "binning.pBins" );
-
-	string title = "; n#sigma dedx; #Delta #beta^{-1} / #beta^{-1} ";
+	if ( tofMetric == inverseBeta )
+		title = "; n#sigma dedx; #Delta #beta^{-1} / #beta^{-1} ";
+	else 
+		title = "; n#sigma dedx; n#sigma#beta^{-1} ";
 	
 	
 	// create a combined, plus, and minus
 	for ( int charge = -1; charge <= 1; charge ++ ){
-		for ( int iEta = 0; iEta < etaBins.size(); iEta++ ){
 
-			double eta = etaBins[ iEta ];
-
-			string name = "nSig_" + sName( pType, charge ) + "_eta" + ts( iEta );
-
-			TH3D * h3 = new TH3D( name.c_str(), title.c_str(), 
-					nSigBinEdges.size()-1, nSigBinEdges.data(), 
-					dBetaBinEdges.size()-1, dBetaBinEdges.data(),
-					pBins.size()-1, pBins.data() );
-
-			book->add( name, h3 );
-		}
-
-
-		string name = "nSig_" + sName( pType, charge ) ;
+		string name = "nSig_" + speciesName( pType, charge ) ;
 
 		TH3D * h3 = new TH3D( name.c_str(), title.c_str(), 
-				nSigBinEdges.size()-1, nSigBinEdges.data(), 
-				dBetaBinEdges.size()-1, dBetaBinEdges.data(),
+				dedxBins.size()-1, dedxBins.data(), 
+				tofBins.size()-1, tofBins.data(),
 				pBins.size()-1, pBins.data() );
 
 		book->add( name, h3 );
-
 	}
 	
 
 
 }
-double pidHistogramMaker::dBeta( string pType, int iHit ){
 
-	double tof = pico->tof[ iHit ];
-	double length = pico->length[ iHit ];
-	double p = pico->p[ iHit ];
-	double beta = pico->beta[ iHit ];
-	double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
-
-
-	double deltaB = 1 - (beta) * TMath::Sqrt( (constants::kaonMass*constants::kaonMass) / (p*p) + 1 );
-
-	if ( "Pi" == pType )
-		deltaB = 1 - (beta) * TMath::Sqrt( (constants::piMass*constants::piMass) / (p*p) + 1 );		
-	if ( "P" == pType )
-		deltaB = 1 - (beta) * TMath::Sqrt( (constants::protonMass*constants::protonMass) / (p*p) + 1 );		
-	
-	return deltaB;
-}
-
-double pidHistogramMaker::nSigInvBeta( string pType, int iHit  ){
-
-	double b = pico->beta[ iHit ];
-	double p = pico->p[ iHit ];
-	double expectedBeta = eBeta( eMass( pType ), p );
-	double invBetaSig = config->getDouble( "binning.invBetaSig" );
-
-	double deltaInvBeta = ( 1.0 / b ) - ( 1.0 / expectedBeta );
-
-	return (deltaInvBeta / invBetaSig);
-}
 
 void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 	
-	
-	vector<double> etaBins = config->getDoubleVector( "binning.eta" );
-	string name = sName( pType, charge );
+	string name = speciesName( pType, charge );
 
 	cout << "\tSpecies Report : " << name << endl;
 
-	string etaRange = "";
-	if ( 0 == etaBin)
-		etaRange = " && 0 < |#eta| < " + ts( etaBins[ etaBin ], 3 );
-	else if ( 0 < etaBin )
-		if ( 0 == etaBin)
-		etaRange = " && " + ts( etaBins[ etaBin - 1 ], 3 ) + " < |#eta| < " + ts( etaBins[ etaBin ], 3 );
-	
-	vector<double>pBins = config->getDoubleVector( "binning.pBins" );
-	bool fitGauss = config->getBool( "pReport.fit1DGauss", false );
-	double fitX1 = config->getDouble( "pReport.fit1DGauss:x1", nSigMin );
-	double fitX2 = config->getDouble( "pReport.fit1DGauss:x2", nSigMax );
 	uint nBinsP = pBins.size();
 
 	TH3 * h3 = book->get3D( "nSig_" + name );
@@ -664,113 +603,39 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 		}
 
 		proj = (TH2*)h3->Project3D( "xy" );
-		string hTitle = (pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) + etaRange );
+		string hTitle = (pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) );
 		string hName = (pType + "_" + ts(i) + "_" + ts(etaBin) );
 		proj->SetTitle( hTitle.c_str()  );
 		gPad->SetLogz( 1 );
 		proj->Draw( "colz" );
-		
-
-		
-		if ( fitGauss ){
-			pReport[ name ]->cd( 2, 1 );
-			proj1D = (TH1D*)h3->Project3D( "x" )->Clone( "fit");
-			proj1D->SetTitle( ("dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) + etaRange ).c_str()  );
-			gPad->SetLogy( 1 );
-			proj1D->Draw( "h" );
-			TF1 * f1 = new TF1( "g1", "gaus", fitX1, fitX2 );
-			f1->SetRange( fitX1, fitX2 );
-			f1->SetParameter( 1, 0 );
-			proj1D->Fit( f1, "QR", "", fitX1, fitX2 );
-		}
 
 		
 		pReport[ name ]->cd( 2, 2 );
 		proj1D = h3->Project3D( "x" );
-		proj1D->SetTitle( ( "dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) + etaRange ).c_str()  );
+		proj1D->SetTitle( ( "dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
 		proj1D->SetFillColor( kBlue );
 		gPad->SetLogx( 1 );
 		proj1D->Draw( "hbar" );
 
-		//can->Print( "test.pdf" );
 		
-
+		
 		pReport[ name ]->cd( 1, 1 );
 		proj1D = h3->Project3D( "y" );
-		proj1D->SetTitle( ( "1/#beta : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) + etaRange ).c_str()  );
+		proj1D->SetTitle( ( "1/#beta : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
 		gPad->SetLogy( 1 );
 		proj1D->SetFillColor( kBlue );
 		proj1D->Draw( "" );
 
-		if ( fitGauss ){
-			TF1 * f2 = new TF1( "g2", "gaus", fitX1, fitX2);
-			f2->SetRange( fitX1, fitX2 );
-			//f2->SetParameter( 1, 0.0 );
-			proj1D->Fit( f2, "QR", "", fitX1, fitX2 );
-		}
-		
 
 		pReport[ name ]->savePage();
 		//pReport[ name ]->saveImage( "report/png/" + hName + ".png" );
 
-		if ( pType == config->getString( "dklFit.pType" ) && charge == 0 && i >= config->getInt( "dklFit.pBin:min", 1 ) && i <= config->getInt( "dklFit.pBin:max", 1 )){
-			dklFit( name, (TH2D*)proj );
-		}
-
 	}
 
-	//can->Print( "test.pdf]");
+	
 
 }
 
-
-void pidHistogramMaker::dklFit( string pName, TH2D * h ) {
-
-	dklMinimizer *dkl = new dklMinimizer( h, config->getInt( "dklFit.nSpecies", 1 ) );
-
-	dkl->run( config->getInt( "dklFit.nIterations", 1 ) );
-
-	pReport[ pName ]->newPage( 3, 2 );
-
-	pReport[ pName ]->cd( 1, 1);
-	gPad->SetLogz(1);
-	dkl->viewInput()->Draw("colz");
-
-	pReport[ pName ]->cd( 2, 1);
-	gPad->SetLogz(1);
-	TH2D* ap = dkl->viewApproximation();
-	double min = ap->GetMinimum();
-	double max = ap->GetMaximum();
-	ap->Draw("colz");
-
-	pReport[ pName ]->cd( 1, 2);
-	gPad->SetLogz(1);
-
-	TH2D* s1 = dkl->viewSpecies( 0 );
-	s1->GetZaxis()->SetRangeUser( min, max );
-	s1->Draw("colz");
-
-	if ( config->getInt( "dklFit.nSpecies" ) >= 2 ){
-		pReport[ pName ]->cd( 2, 2);
-		gPad->SetLogz(1);
-		TH2D* s2 = dkl->viewSpecies( 1 );
-		s2->GetZaxis()->SetRangeUser( min, max );
-		s2->Draw("colz");
-	}
-
-	if ( config->getInt( "dklFit.nSpecies" ) >= 3 ){
-		pReport[ pName ]->cd( 3, 2);
-		gPad->SetLogz(1);
-		TH2D* s3 = dkl->viewSpecies( 2 );
-		s3->GetZaxis()->SetRangeUser( min, max );
-		s3->Draw("colz");
-	}
-
-	pReport[ pName ]->savePage();
-
-
-
-}
 
 
 

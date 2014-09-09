@@ -42,12 +42,22 @@ private:
 	map< string, reporter * > pReport;
 
 
-	// removing overflows
-	double pMax, pMin, nSigMax, nSigMin;
-	double dBetaMax, dBetaMin;
+	// binning information
+	double pMax, pMin;
+	vector<double> pBins;
+	double dedxMax, dedxMin;
+	vector<double> dedxBins;
+	double tofMax, tofMin;
+	vector<double> tofBins;
 
 	//QA memebers
 	double vOffsetX, vOffsetY;
+
+	// tof Metric
+	string tofMetric;
+	static const string inverseBeta;
+	static const string deltaBeta;
+	double inverseBetaSigma;
 
 public:
 
@@ -59,9 +69,9 @@ public:
 	~pidHistogramMaker();
 	
 	void makeQA();
-	void make();
+	void makePidHistograms();
 
-	TGraph* inverseBeta( double m, double p1, double p2, double step = .05 );
+	TGraph* inverseBetaGraph( double m, double p1, double p2, double step = .05 );
 	
 	bool keepEventQA();
 	bool keepTrackQA( uint iHit );
@@ -69,8 +79,8 @@ public:
 
 protected:
 
-	void sHisto( string pType );
-	string sName( string pType, int charge );
+	void prepareHistograms( string pType );
+	string speciesName( string pType, int charge );
 	void speciesReport( string pType, int charge, int etaBin = -1 );
 
 	double nSigDedx( string pType, int iHit ) { 
@@ -82,8 +92,34 @@ protected:
 			return pico->nSigPi[ iHit ];
 		return -999.0;
 	}
-	double nSigInvBeta( string pType, int iHit  );
-	double dBeta( string pType, int iHit  );
+	double nSigInvBeta( string pType, int iHit  ){
+
+		double betaMeasured = pico->beta[ iHit ];
+		double p = pico->p[ iHit ];
+		double betaExpected = eBeta( eMass( pType ), p );
+		
+		double deltaInvBeta = ( 1.0 / betaMeasured ) - ( 1.0 / betaExpected );
+
+		return (deltaInvBeta / inverseBetaSigma);
+	}
+	double dBeta( string pType, int iHit  ){
+
+		double tof = pico->tof[ iHit ];
+		double length = pico->length[ iHit ];
+		double p = pico->p[ iHit ];
+		double beta = pico->beta[ iHit ];
+		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
+
+
+		double deltaB = 1 - (beta) * TMath::Sqrt( (constants::kaonMass*constants::kaonMass) / (p*p) + 1 );
+
+		if ( "Pi" == pType )
+			deltaB = 1 - (beta) * TMath::Sqrt( (constants::piMass*constants::piMass) / (p*p) + 1 );		
+		if ( "P" == pType )
+			deltaB = 1 - (beta) * TMath::Sqrt( (constants::protonMass*constants::protonMass) / (p*p) + 1 );		
+		
+		return deltaB;
+	}
 
 	double eBeta( double m, double p ){
 		return TMath::Sqrt( p*p / ( p*p + m*m ) );
@@ -98,7 +134,6 @@ protected:
 		return -10.0;	
 	}
 
-	void dklFit( string name, TH2D* h );
 
 	/*
 	*	Utility functions that should be moved soon
