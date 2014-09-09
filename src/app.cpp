@@ -4,6 +4,9 @@
 #include "constants.h"
 #include "histoBook.h"
 #include "xmlConfig.h"
+#include "jdbUtils.h"
+
+using namespace jdbUtils;
 
 /* 
 *
@@ -48,6 +51,8 @@ int main( int argc, char* argv[] ) {
 
         cout << "bins.p" << config.getString( "bins.p" ) << endl;
 
+        config.getDoubleVector( "textText" );
+
         book->makeAll( "h" );
 
         cout << " red is : " << book->color( "green" ) << endl;
@@ -59,6 +64,21 @@ int main( int argc, char* argv[] ) {
         
 
         delete book;
+
+        cout << "jdbUtils Tests: " << endl;
+        cout << " int to string " << ts( 1000 ) << endl;
+        cout << " double to string " << ts( 1000.123123 ) << endl;
+        cout << " float to string " << ts( 1000.123f ) << endl;
+
+        taskTimer tt;
+        tt.start();
+
+        taskProgress tp( "taskProgress Test", 2000000 );
+        for ( int i = 0; i < 2000000; i++ ){
+          //progressBar( i, 2000 );
+          tp.showProgress( i );
+        }
+        //cout << "Elapsed: " << tt.elapsed() << " [sec] " << endl;
         
     }
 
