@@ -11,13 +11,19 @@ using namespace std;
 void binary( string inFile = "allSim.root", int cSpecies = 1, bool cutDedx = false ){
 
 	TCanvas * c = new TCanvas( "c", "c", 800, 800 );
-	c->Print( "bPID.pdf[");
+	string outName = "rpBinaryPid.pdf";
+	c->Print( (outName+"[").c_str() );
 
 	TFile * f = new TFile( inFile.c_str(), "READ" );
 
+	string rOutName = "rootBinaryPid.root";
+	TFile * fOut = new TFile( rOutName.c_str(), "RECREATE" );
+
+	vector<double>effVsP;
+	vector<double>pureVsP;
 
 	c->Divide( 2, 2 );
-	for ( int i = 0; i < 50; i++ ){
+	for ( int i = 0; i < 70; i++ ){
 
 		stringstream sstr;
 		sstr << "h_dedx_tof_p3_b" << i;
@@ -47,18 +53,23 @@ void binary( string inFile = "allSim.root", int cSpecies = 1, bool cutDedx = fal
 		TH1* pX = sum->ProjectionX();
 		TH1* pY = sum->ProjectionY();
 		pY->SetFillColor( kBlue );
+		pY->SetLineColor( kBlue );
 		pY->Draw("hbar");
 
 
 		c->cd(1);
 		gPad->SetLogy(1);
 		pX->SetFillColor( kBlue );
-		pX->Draw();
+		pX->SetLineColor( kBlue );
+		pX->Draw("h");
 		c->cd(2);
 		
-
-		TH1D* eff = pid->efficiency( 0.0, 5.0, 0.1 );
-		TH1D* pure = pid->purity( 0.0, 5.0, 0.1 );
+		sstr.str("");
+		sstr << "eff_" << i;
+		TH1D* eff = pid->efficiency( sstr.str(), 0.0, 5.0, 0.1 );
+		sstr.str("");
+		sstr << "pure_" << i;
+		TH1D* pure = pid->purity( sstr.str(), 0.0, 5.0, 0.1 );
 
 		gStyle->SetOptStat( 0 );
 		eff->SetTitle( "Efficiecy (Blue), Purity (Red)" );
@@ -69,11 +80,38 @@ void binary( string inFile = "allSim.root", int cSpecies = 1, bool cutDedx = fal
 		pure->SetLineWidth( 2 );
 		pure->Draw("same");
 
-		c->Print( "bPID.pdf");
+		effVsP.push_back( pid->efficiency() );
+		pureVsP.push_back( pid->purity( ) );
+
+		c->Print( outName.c_str());
 	}
 
+	int nBins = (3.7 - 0.2) / 0.05;
+	TH1D * hEffVsP = new TH1D( "hEffVsP", "Efficiency Vs. P; P [GeV]", nBins, 0.2, 3.7 );
+	for ( int i = 0; i < effVsP.size(); i++ ){
+		hEffVsP->SetBinContent( i, effVsP[ i ] );
+	}
+	TH1D * hPureVsP = new TH1D( "hPureVsP", "Purity Vs. P; P [GeV]", nBins, 0.2, 3.7 );
+	for ( int i = 0; i < pureVsP.size(); i++ ){
+		hPureVsP->SetBinContent( i, pureVsP[ i ] );
+	}
 
-	c->Print( "bPID.pdf]");
+	c->Divide( 1 );
+	c->cd( 0 );
+	hEffVsP->GetYaxis()->SetRangeUser( 0.0, 1.05);
+	hEffVsP->SetLineWidth( 2 );
+	hEffVsP->SetTitle( "Efficiency (Blue), Purity (Red)" );
+	hEffVsP->Draw( "");
+	hPureVsP->SetLineColor( kRed );
+	hPureVsP->SetLineWidth( 2 );
+	hPureVsP->Draw( "same" );
 
+	c->Print( outName.c_str());
+
+
+
+	c->Print( (outName+"]").c_str() );
+
+	fOut->Write();
 
 }

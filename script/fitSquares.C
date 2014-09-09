@@ -22,6 +22,8 @@
 #include "RooPlot.h"
 #include "RooPolynomial.h"
 
+#include "sstream"
+using namespace std;
 
 Double_t background( Double_t * x, Double_t * par);
 Double_t gaussian( Double_t * x, Double_t * par);
@@ -38,97 +40,168 @@ TH1D* dSlice;	// 1D slice of the dedx "" ""
 void fitSquares() {
 
 
+	TH1D * hMean = new TH1D( "mean", "mean", 28, 0, 28 );
+	TH1D * hSigma = new TH1D( "sigma", "sigma", 28, 0, 28 );
+
 	TFile* data = new TFile( "dqa.root", "READ" );
 
 	h3 = (TH3D*) data->Get( "nSig_K_All_eta0" );
 
-	slice( 1 );
 
-	//bSlice->Draw();
-	//gPad->SetLogy(1);
+	TCanvas * c = new TCanvas( "c", "K Fit", 800, 600 );
+	string outName = "rpRooK.pdf";
+	c->Print( (outName+"[").c_str() );
+	for ( int i = 1 ; i < 26; i ++ ){
+		slice( i );
+		
+
+		rooLinearGaussian( i, bSlice );
+		gPad->SetLogy(1);
+
+		c->Print( (outName).c_str() );
+
+
+		hMean->SetBinContent( i-1, rrvMean->getVal() );
+		hMean->SetBinError( i-1, rrvMean->getError() );
+		hSigma->SetBinContent( i-1, rrvSigma->getVal() );
+		hSigma->SetBinError( i-1, rrvSigma->getError() );
+
+
+	}
+
+	gPad->SetLogy(0);
+	hMean->Draw( "pe" );
+
+	c->Print( (outName).c_str() );
+
+	hSigma->Draw( "pe" );
+	c->Print( (outName).c_str() );
+
+	c->Print( (outName+"]").c_str() );
 	
-/*
-	TF1* bFit = new TF1( "bFit", combFit, -1, 1, 5);
-	bFit->SetParameters( 1, 1, 1, 1, 1);
-	bFit->SetNpx( 500 );
-	bSlice->Fit( bFit );
-*/
-
-	//bSlice->Draw( "pe" );
-	//bSlice->Sumw2();
-	//dSlice->Sumw2();
-	rooLinearGaussian( bSlice );
-	//dSlice->Draw();
 
 }
 
 void slice( int pBin ){
 
-	h3->GetZaxis()->SetRange( 1, 1 );
+	h3->GetZaxis()->SetRange( pBin, pBin );
 	pSlice = (TH2D*)h3->Project3D("xy");
 	bSlice = (TH1D*)h3->Project3D( "y" );
 	dSlice = (TH1D*)h3->Project3D( "x" );
 }
 
-Double_t background( Double_t * x, Double_t * par){
-	return par[0] + par[ 1 ] * x[ 0 ];
-	
-}
-Double_t gaussian( Double_t * x, Double_t * par){
-	double alpha = (x[0] - par[ 1 ])*(x[0] - par[ 1 ]);
-	double beta = 2 * par[ 2 ] * par[ 2 ];
-	return par[ 0 ] * TMath::Exp( - (alpha / beta) );
-}
-Double_t combFit( Double_t * x, Double_t * par){
-	return background(x, par) +  gaussian( x, &par[2]);
-}
 
+RooRealVar * rrvMean;
+RooRealVar * rrvSigma;
 
-using namespace RooFit;
-
-void rooLinearGaussian( TH1D* h ){
-
+void rooLinearGaussian( int pBin, TH1D* h ){
+	using namespace RooFit;
 	
 
 	RooRealVar x("x", "x", -.15, .15);
 	RooDataHist rdh( "data", "data", RooArgSet( x ), h );
 
-	RooRealVar g1( "mean", "gaussian mean", 0, -1, 1 );
-	RooRealVar g2( "sigma", "gaussian sigma", .01, 0, 10 );
+	RooAbsPdf *model;
 
-	RooGaussian gauss( "gauss", "gauss", x, g1, g2 );
+	if ( pBin <= 26 ){
+		model = makeGauss( "gauss1_", &x );
+		double io = ((double) (pBin) / 24.0) * .02;
+		
+		x.setRange( "cr", -.04 + io , .04 - io );
+	} else {
+		return;
+		//model = makeDoubleGauss( "gauss1_", "gauss2_", &x );
+		model = makeGauss( "gauss1_", &x );
+		x.setRange( "cr", -.02, .02 );
+	}
 
-	
-	
-	
-	RooRealVar tau("tau","tau",.01548) ;
-	// Build a gaussian resolution model
-	RooRealVar bias1("bias1","bias1",0) ;
-	RooRealVar sigma1("sigma1","sigma1",.01) ;
-	RooGaussModel gm1("gm1", "gauss model 1", x, bias1, sigma1);
 
-	// Construct decay(t) (x) gauss1(t)
-	RooDecay decay_gm1("decay_gm1", "decay", x, tau, gm1, RooDecay::DoubleSided );
-
-	RooPlot * frame = x.frame();
+	stringstream sstr;
+	sstr << " pBin : " << pBin;
+	RooPlot * frame = x.frame( Title( sstr.str().c_str() ) );
 
 	// Plot p.d.f. 
-	decay_gm1.plotOn(frame) ;
-
-
 	
+	rdh.plotOn( frame );
+	model->fitTo( rdh, Extended(), Range( "cr" ) );
 
-	
-	/*
-	data->plotOn( frame );
-	
-	gauss.fitTo( *data );
 
-	gauss.plotOn( frame );
-	*/
+	model->plotOn( frame, LineColor( kRed), Range("full") );
+	
+	
 	frame->Draw();
-	//gPad->SetLogy();
 
+	delete model;
+	
+
+}
+
+
+
+RooAddPdf * makeSpecies(	int nSpecies, RooRealVar *x ) {
+	using namespace RooFit;
+
+	if ( nSpecies == 1 ){
+		cout << " one species " << endl;
+		//RooRealVar x("x", "x", x1, x2);
+		RooRealVar *g1 = new RooRealVar( "mean", "gaussian mean", 0, -0.005, 0.005 );
+		RooRealVar *g2 = new RooRealVar( "sigma", "gaussian sigma", .01, 0, .05 );
+
+		RooGaussian gauss( "gauss", "gauss", *x, *g1, *g2 );
+
+		RooRealVar *h1 = new RooRealVar( "hmean", "haussian mean", 0, -0.05, 0.05 );
+		RooRealVar *h2 = new RooRealVar( "hsigma", "haussian sigma", .01, 0, .05 );
+
+		RooGaussian hauss( "hauss", "hauss", *x, *h1, *h2 );
+
+		RooRealVar p1( "p1", "p1", 1, -1000, 1000 );
+		RooRealVar p2( "p2", "p2", 1, -1000, 1000 );
+		RooRealVar p3( "p3", "p3", 1, -1000, 1000 );
+		RooRealVar p4( "p4", "p4", 1, -1000, 1000 );
+
+		RooPolynomial poly( "poly", "poly", *x, RooArgList( p1, p2, p3, p4 ) );
+
+		RooRealVar w1( "w1", "w1", 1, 0, 10000000 );
+		RooRealVar w2( "w2", "w2", 1, 0, 10000000 );
+		RooRealVar w3( "w2", "w2", 1, 0, 10000000 );
+
+		RooAddPdf * model = new RooAddPdf( "model", "model", RooArgList( poly, gauss, hauss), RooArgList( w1, w2, w3 ) );
+		return model;
+	}	
+
+	return  (new RooAddPdf( "model", "model" ));
+}
+
+RooGaussian * makeGauss( string name, RooRealVar *x ) {
+	using namespace RooFit;
+	
+	rrvMean = new RooRealVar( (name+"mean").c_str(), "gaussian mean", 0, -0.15, 0.15 );
+	rrvSigma = new RooRealVar( (name+"sigma").c_str(), "gaussian sigma", .01, 0.00, .15 );
+
+	RooGaussian * gauss = new RooGaussian( name.c_str(), "gaussian", *x, *rrvMean, *rrvSigma );
+
+	return gauss;
+}
+
+RooAbsPdf * makeDoubleGauss( string n1, string n2, RooRealVar *x ) {
+	using namespace RooFit;
+	
+	RooRealVar *c1 = new RooRealVar( (n1+"mean").c_str(), "gaussian mean", 0, -.03, .03 );
+	RooRealVar *c2 = new RooRealVar( (n1+"sigma").c_str(), "gaussian sigma", .01, 0.005, .1 );
+
+	RooGaussian * gauss1 = new RooGaussian( n1.c_str(), "gaussian", *x, *c1, *c2 );
+
+	RooRealVar *c3 = new RooRealVar( (n2+"mean").c_str(), "gaussian mean", -.10, -.15, -.35 );
+	RooRealVar *c4 = new RooRealVar( (n2+"sigma").c_str(), "gaussian sigma", .01, 0.00, .15 );
+
+	RooGaussian * gauss2 = new RooGaussian( n1.c_str(), "gaussian", *x, *c3, *c4 );
+
+	RooRealVar* w1 = new RooRealVar( "w1", "w1", 1, 0, 10000000 );
+	RooRealVar* w2 = new RooRealVar( "w2", "w2", 1, 0, 10000000 );
+
+	RooAddPdf *model = new RooAddPdf( (n1+n2).c_str(), "double gaussian", RooArgList( *gauss1, *gauss2 ), RooArgList( *w1, *w2) );
+
+	return gauss1;
 }
 
 

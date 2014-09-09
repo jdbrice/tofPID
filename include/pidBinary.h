@@ -72,13 +72,32 @@ public:
 		return (TH1D*)proj;
 
 	}
-	TH1D* efficiency( double low = 0.5, double high = 5.5, double step = 0.25){
+
+	double yield( TH1 * h, double cut ){
+
+		int bLow = h->GetXaxis()->FindBin( -cut );
+		int bHigh = h->GetXaxis()->FindBin( cut );
+		return h->Integral( bLow, bHigh );
+	}
+
+	double efficiency( double cut = 1.0 ){
+		TH1*proj = truth[ centerSpecies ]->ProjectionX();
+		if ( !cutOnDedx ){
+			proj = truth[ centerSpecies ]->ProjectionY();
+		}
+		double total = proj->Integral();
+		double inCut = yield( proj, cut );
+		if ( total > 0 )
+			return inCut / total;
+		return 0;
+	}
+	TH1D* efficiency( string name, double low = 0.5, double high = 5.5, double step = 0.25){
 
 		double cutLow = low;
 		double cutHigh = high;
 		double cutStep = step;
 		int n = (cutHigh - cutLow ) / cutStep;
-		TH1D* effPlot = new TH1D( "efficiency", "efficiency; Cut( N_{#sigma} dedx )", n, cutLow, cutHigh );
+		TH1D* effPlot = new TH1D( name.c_str(), "efficiency; Cut( N_{#sigma} dedx )", n, cutLow, cutHigh );
 
 
 		TH1*proj = truth[ centerSpecies ]->ProjectionX();
@@ -91,9 +110,8 @@ public:
 		int bin = 0;
 		for ( double cut = cutLow; cut < cutHigh; cut += cutStep ){
 
-			int bLow = proj->GetXaxis()->FindBin( -1 * cut );
-			int bHigh = proj->GetXaxis()->FindBin( 1 * cut );
-			double inCut = proj->Integral( bLow, bHigh );
+			
+			double inCut = yield( proj, cut );
 
 			effPlot->SetBinContent( bin, (inCut / total ) );
 			bin++;
@@ -102,13 +120,31 @@ public:
 
 		return effPlot;
 	}
-	TH1D* purity( double low = 0.5, double high = 5.5, double step = 0.25){
+
+	double purity( double cut = 1.0 ) {
+		TH1*proj = truth[ centerSpecies ]->ProjectionX();
+		if ( !cutOnDedx ){
+			proj = truth[ centerSpecies ]->ProjectionY();
+		}
+
+		TH1*projSum = dataHist->ProjectionX();
+		if ( !cutOnDedx ){
+			projSum = dataHist->ProjectionY();
+		}
+		double total = yield( projSum, cut );
+		double inCut = yield( proj, cut );
+		if ( total > 0 )
+			return inCut / total;
+		return 0;
+
+	}
+	TH1D* purity( string name, double low = 0.5, double high = 5.5, double step = 0.25){
 
 		double cutLow = low;
 		double cutHigh = high;
 		double cutStep = step;
 		int n = (cutHigh - cutLow ) / cutStep;
-		TH1D* purePlot = new TH1D( "purity", "purity", n, cutLow, cutHigh );
+		TH1D* purePlot = new TH1D( name.c_str(), "purity", n, cutLow, cutHigh );
 
 		TH1*proj = truth[ centerSpecies ]->ProjectionX();
 		if ( !cutOnDedx )

@@ -12,13 +12,21 @@ using namespace std;
 void square( string inFile = "allSim.root", int cSpecies = 1 ){
 
 	TCanvas * c = new TCanvas( "c", "c", 800, 800 );
-	c->Print( "bPID.pdf[");
+	string outName = "rpSquarePid.pdf";
+
+	c->Print( (outName+"[").c_str() );
 
 	TFile * f = new TFile( inFile.c_str(), "READ" );
 
+	string rOutName = "rootSquarePid.root";
+	TFile * fOut = new TFile( rOutName.c_str(), "RECREATE" );
+	
+
+	vector<double>effVsP;
+	vector<double>pureVsP;
 
 	c->Divide( 2, 2 );
-	for ( int i = 0; i < 50; i++ ){
+	for ( int i = 0; i < 70; i++ ){
 
 		stringstream sstr;
 		sstr << "h_dedx_tof_p3_b" << i;
@@ -56,24 +64,55 @@ void square( string inFile = "allSim.root", int cSpecies = 1 ){
 		pX->Draw();
 		c->cd(2);
 		
+		sstr.str("");
+		sstr << "eff_" << i;
+		TH1D* eff = pid->efficiency( sstr.str(), 0.0, 5.0, 0.1 );
 
-		TH1D* eff = pid->efficiency( 0.0, 5.0, 0.1 );
-		//TH1D* pure = pid->purity( 0.0, 5.0, 0.1 );
+		sstr.str("");
+		sstr << "pure_" << i;
+		TH1D* pure = pid->purity( sstr.str(), 0.0, 5.0, 0.1 );
 
 		gStyle->SetOptStat( 0 );
 		eff->SetTitle( "Efficiecy (Blue), Purity (Red)" );
 		eff->GetYaxis()->SetRangeUser(0, 1.05);
 		eff->SetLineWidth( 2 );
 		eff->Draw();
-		//pure->SetLineColor( kRed );
-		//pure->SetLineWidth( 2 );
-		//pure->Draw("same");
+		pure->SetLineColor( kRed );
+		pure->SetLineWidth( 2 );
+		pure->Draw("same");
 
-		c->Print( "bPID.pdf");
+		effVsP.push_back( pid->efficiency() );
+		pureVsP.push_back( pid->purity() );
+
+		c->Print( outName.c_str());
 	}
 
+	int nBins = (3.7 - 0.2) / 0.05;
+	TH1D * hEffVsP = new TH1D( "hEffVsP", "Efficiency Vs. P; P [GeV]", nBins, 0.2, 3.7 );
+	for ( int i = 0; i < effVsP.size(); i++ ){
+		hEffVsP->SetBinContent( i, effVsP[ i ] );
+	}
+	TH1D * hPureVsP = new TH1D( "hPureVsP", "Purity Vs. P; P [GeV]", nBins, 0.2, 3.7 );
+	for ( int i = 0; i < pureVsP.size(); i++ ){
+		hPureVsP->SetBinContent( i, pureVsP[ i ] );
+	}
 
-	c->Print( "bPID.pdf]");
+	c->Divide( 1 );
+	c->cd( 0 );
+	hEffVsP->GetYaxis()->SetRangeUser( 0.0, 1.05);
+	hEffVsP->SetLineWidth( 2 );
+	hEffVsP->SetTitle( "Efficiency (Blue), Purity (Red)" );
+	hEffVsP->Draw( "");
+	hPureVsP->SetLineColor( kRed );
+	hPureVsP->SetLineWidth( 2 );
+	hPureVsP->Draw( "same" );
+
+	c->Print( outName.c_str());
+
+
+	c->Print( (outName+"]").c_str() );
+
+	fOut->Write();
 
 
 }

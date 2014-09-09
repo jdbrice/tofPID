@@ -26,8 +26,8 @@
 #include "TFile.h"
 
 #include "vector"
-#include "sstring"
-#include "string";
+#include "string"
+using namespace std;
 
 class pidSquare
 {
@@ -70,6 +70,16 @@ public:
 		return yield;
 
 	}
+
+	double efficiency( double cut = 1.0 ){
+
+		TH2* hTruth = truth[ centerSpecies ];
+		double total = hTruth->Integral();
+		double inCut = yield( hTruth, -cut, cut, -cut*aspect, cut*aspect );
+		return (inCut / total);
+
+	}
+
 	TH1D* efficiency( string name, double low = 0.5, double high = 5.5, double step = 0.25){
 
 		double cutLow = low;
@@ -96,44 +106,40 @@ public:
 
 		return effPlot;
 	}
-	/*TH1D* purity( double low = 0.5, double high = 5.5, double step = 0.25){
+
+	double purity( double cut = 1.0 ){
+
+		TH2* hTruth = truth[ centerSpecies ];
+		double total = yield( dataHist, -cut, cut, -cut*aspect, cut*aspect );
+		double inCut = yield( hTruth, -cut, cut, -cut*aspect, cut*aspect );
+		if ( 0 < total )
+			return inCut / total;
+		return 0.0;
+	}
+	TH1D* purity( string name, double low = 0.5, double high = 5.5, double step = 0.25){
 
 		double cutLow = low;
 		double cutHigh = high;
 		double cutStep = step;
 		int n = (cutHigh - cutLow ) / cutStep;
-		TH1D* purePlot = new TH1D( "purity", "purity", n, cutLow, cutHigh );
 
-		TH1*proj = truth[ centerSpecies ]->ProjectionX();
-		if ( !cutOnDedx )
-			proj = truth[ centerSpecies ]->ProjectionY();
+		TH1D* purePlot = new TH1D( name.c_str(), "purity", n, cutLow, cutHigh );
 
+		TH2* hTruth = truth[ centerSpecies ];
 		
 		int bin = 0;
 		for ( double cut = cutLow; cut < cutHigh; cut += cutStep ){
 
-			int bLow = proj->GetXaxis()->FindBin( -1 * cut );
-			int bHigh = proj->GetXaxis()->FindBin( 1 * cut );
+			double total = yield( dataHist, -cut, cut, -(cut*aspect), cut*aspect );
+			double inCut = yield( hTruth, -cut, cut, -(cut*aspect), cut*aspect );
 
-			double total = 0;
-			for ( int i = 0; i < truth.size(); i++ ){
-				TH1* pTruth = truth[ i ]->ProjectionX();
-				
-				if ( !cutOnDedx )
-					pTruth = truth[ i ]->ProjectionY();
-
-				total += pTruth->Integral( bLow, bHigh );
-			}
-
-			double inCut = proj->Integral( bLow, bHigh );
-
+			//cout << name << " : cut = " << cut << " total : " << total << " inCut : " << inCut << endl;
 			purePlot->SetBinContent( bin, (inCut / total ) );
 			bin++;
-
 		}
 
 		return purePlot;
 	}
-*/
+
 	
 };
