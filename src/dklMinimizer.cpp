@@ -2,7 +2,8 @@
 
 #include "dklMinimizer.h"
 #include <time.h> 
-#include "utils.h"
+#include "jdbUtils.h"
+using namespace jdbUtils;
 
 dklMinimizer::dklMinimizer( TH2D* d, uint nSpecies, double rotate ) {
 	cout << "[dklMinimizer." << __FUNCTION__ << "] " << endl;

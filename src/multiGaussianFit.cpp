@@ -1,9 +1,7 @@
 
 #include "multiGaussianFit.h"
-#include "utils.h"
-
+#include "jdbUtils.h"
 using namespace jdbUtils;
-
 
 multiGaussianFit::multiGaussianFit( TH2* h, uint nS ){
 	cout << "[multiGaussianFit." << __FUNCTION__ << "]" << endl;

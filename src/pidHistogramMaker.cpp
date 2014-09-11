@@ -2,7 +2,7 @@
 #include "constants.h"
 #include "pidHistogramMaker.h"
 #include "histoBook.h"
-#include "dklMinimizer.h"
+
 #include <fstream>
 #include <sstream>
 
@@ -61,6 +61,10 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	vOffsetY = config->getDouble( "cut.vOffset:y", 0 );
 
 	inverseBetaSigma = config->getDouble( "binning.invBetaSigma", 0.012 );
+	dedxSigma = config->getDouble( "binning.dedxSigma", 0.012 );
+	// for centering only
+	tofGen = new tofGenerator( inverseBetaSigma );
+	dedxGen = new dedxGenerator(  );
 }
 
 /**
@@ -390,8 +394,6 @@ TGraph * pidHistogramMaker::inverseBetaGraph( double m, double p1, double p2, do
 
 void pidHistogramMaker::makePidHistograms() {
 
-	startTimer();
-
 	if ( !_chain ){
 		cout << "[pidHistogramMaker." << __FUNCTION__ << "] ERROR: Invalid chain " << endl;
 		return;
@@ -408,12 +410,13 @@ void pidHistogramMaker::makePidHistograms() {
 		prepareHistograms( parts[ i ] );
 	}
 
+	taskProgress tp( "Making Pid Histograms", nevents );
 	// loop over all events to produce the histograms
 	for(Int_t i=0; i<nevents; i++) {
     	_chain->GetEntry(i);
 
     	// report progress
-    	progressBar( i, nevents, 60 );
+    	tp.showProgress( i );
 
     	// use the QA event cuts
     	if ( !keepEventQA() )
@@ -481,8 +484,6 @@ void pidHistogramMaker::makePidHistograms() {
 		//speciesReport( parts[ i ], 1 );
 	}
 
-
-	cout << "[pidHistogramMaker." << __FUNCTION__ << "] completed in " << elapsed() << " seconds " << endl;
 }
 
 string pidHistogramMaker::speciesName( string pType, int charge ){
@@ -498,7 +499,6 @@ string pidHistogramMaker::speciesName( string pType, int charge ){
 
 void pidHistogramMaker::prepareHistograms( string pType ) {
 	cout << "[pidHistogramMaker." << __FUNCTION__ << "] Center Species : " << pType << endl;
-
 	/**
 	 * Make the dedx binning 
 	 */
@@ -551,9 +551,10 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 	string title = "";
 
 	if ( tofMetric == inverseBeta )
-		title = "; n#sigma dedx; #Delta #beta^{-1} / #beta^{-1} ";
+		title = "; n#sigma dedx; n#sigma #beta^{-1} ";
 	else 
-		title = "; n#sigma dedx; n#sigma#beta^{-1} ";
+		title = "; n#sigma dedx; #Delta #beta^{-1} / #beta^{-1} ";
+		
 	
 	
 	// create a combined, plus, and minus
@@ -581,12 +582,25 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 	cout << "\tSpecies Report : " << name << endl;
 
 	uint nBinsP = pBins.size();
+	
 
 	TH3 * h3 = book->get3D( "nSig_" + name );
 
+	taskProgress tp( pType + " report", nBinsP );
+
+	// for putting nice ranges on plots
+	double tofPadding = config->getDouble( "binning.tof:padding", 5 );
+	double dedxPadding = config->getDouble( "binning.dedx:padding", 5 );
+	double tofScalePadding = config->getDouble( "binning.tof:paddingScale", .05 );
+	double dedxScalePadding = config->getDouble( "binning.dedx:paddingScale", .05 );
+
 	for ( uint i = 0; i < nBinsP; i ++ ){
 
-		progressBar( i, nBinsP, 60 );
+		tp.showProgress( i );
+
+		// momentum value used for finding nice range
+		double p = pBins[ i ];
+
 
 		pReport[ name ]->newPage( 2, 2 );
 		pReport[ name ]->cd( 1, 2 );
@@ -601,38 +615,113 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 			pLow = h3->GetZaxis()->GetBinLowEdge( 1 );
 			pHi = h3->GetZaxis()->GetBinLowEdge( pBins.size()-1 );
 		}
+		
 
-		proj = (TH2*)h3->Project3D( "xy" );
+		string order = "xy";
+		string tofAxis = config->getString( "binning.tofAxis", "x" );
+		if ( tofAxis == "y" )
+			order = "yx";
+		
+
+		proj = (TH2*)h3->Project3D( order.c_str() );
+		
+		if ( i > 0 && tofMetric == inverseBeta ){
+			double tofLow, tofHigh, dedxLow, dedxHigh;
+			autoViewport( p, &tofLow, &tofHigh, &dedxLow, &dedxHigh, tofPadding, dedxPadding, tofScalePadding, dedxScalePadding );
+		
+			proj->GetYaxis()->SetRangeUser( tofLow, tofHigh );
+			proj->GetXaxis()->SetRangeUser( dedxLow, dedxHigh );
+		}
+		
 		string hTitle = (pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 ) );
 		string hName = (pType + "_" + ts(i) + "_" + ts(etaBin) );
 		proj->SetTitle( hTitle.c_str()  );
 		gPad->SetLogz( 1 );
 		proj->Draw( "colz" );
 
-		
-		pReport[ name ]->cd( 2, 2 );
-		proj1D = h3->Project3D( "x" );
-		proj1D->SetTitle( ( "dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
-		proj1D->SetFillColor( kBlue );
-		gPad->SetLogx( 1 );
-		proj1D->Draw( "hbar" );
+	
+		if ( tofAxis == "x" ){
+			pReport[ name ]->cd( 2, 2 );
+			proj1D = proj->ProjectionX();
+			proj1D->SetTitle( ( "dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
+			proj1D->SetFillColor( kBlue );
+			gPad->SetLogx( 1 );
+			proj1D->Draw( "hbar" );
+
+			pReport[ name ]->cd( 1, 1 );
+			proj1D = proj->ProjectionY();
+			proj1D->SetTitle( ( "1/#beta : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
+			gPad->SetLogy( 1 );
+			proj1D->SetFillColor( kBlue );
+			proj1D->Draw( "" );
+		} else {
+			pReport[ name ]->cd( 2, 2 );
+			proj1D = proj->ProjectionY();
+			proj1D->SetTitle( ( "#beta^{-1} : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
+			proj1D->SetFillColor( kBlue );
+			gPad->SetLogx( 1 );
+			proj1D->Draw( "hbar" );
+
+			pReport[ name ]->cd( 1, 1 );
+			proj1D = proj->ProjectionX();
+			proj1D->SetTitle( ( "dedx : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
+			gPad->SetLogy( 1 );
+			proj1D->SetFillColor( kBlue );
+			proj1D->Draw( "" );
+		}
 
 		
-		
-		pReport[ name ]->cd( 1, 1 );
-		proj1D = h3->Project3D( "y" );
-		proj1D->SetTitle( ( "1/#beta : " + pType + " : " + ts( pLow, 4 ) + " #leq " + " P #leq" + ts( pHi, 4 )  ).c_str()  );
-		gPad->SetLogy( 1 );
-		proj1D->SetFillColor( kBlue );
-		proj1D->Draw( "" );
 
 
 		pReport[ name ]->savePage();
-		//pReport[ name ]->saveImage( "report/png/" + hName + ".png" );
 
 	}
 
 	
+
+}
+
+void pidHistogramMaker::autoViewport( 	double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 
+										double tofPadding, double dedxPadding, double tofScaledPadding, double dedxScaledPadding  ){
+
+
+	// tof Means
+	double tofMeanP = tofGen->mean( p, constants::protonMass );
+	double tofMeanK = tofGen->mean( p, constants::kaonMass );
+	double tofMeanPi = tofGen->mean( p, constants::piMass );
+
+	// dedx Means
+	double dedxMeanP = TMath::Log10(dedxGen->mean( p, constants::protonMass ));
+	double dedxMeanK = TMath::Log10(dedxGen->mean( p, constants::kaonMass ));
+	double dedxMeanPi = TMath::Log10(dedxGen->mean( p, constants::piMass ));
+
+
+	*tofHigh = (( tofMeanP - tofMeanK ) / inverseBetaSigma) + tofPadding;
+	*tofLow = (( tofMeanPi - tofMeanK ) / inverseBetaSigma) - tofPadding;
+
+	*dedxHigh = (( dedxMeanP - dedxMeanK ) / dedxSigma) + dedxPadding;
+	*dedxLow = (( dedxMeanPi - dedxMeanK ) / dedxSigma) - dedxPadding;
+
+	double scaledPaddingTof = (*tofHigh - *tofLow ) * tofScaledPadding;
+	double scaledPaddingDedx = (*dedxHigh - *dedxLow ) * dedxScaledPadding;
+
+	*tofLow -= scaledPaddingTof;
+	*tofHigh += scaledPaddingTof;
+
+	*dedxLow -= scaledPaddingDedx;
+	*dedxHigh += scaledPaddingDedx;
+
+	if ( *tofLow < tofMin )
+		*tofLow = tofMin;
+	if ( *tofHigh > tofMax )
+		*tofHigh = tofMax;
+
+	if ( *dedxLow < dedxMin )
+		*dedxLow = dedxMin;
+	if ( *dedxHigh > dedxMax )
+		*dedxHigh = dedxMax;
+
+	return;
 
 }
 

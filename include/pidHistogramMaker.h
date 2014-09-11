@@ -6,6 +6,8 @@
 #include "histoBook.h"
 #include "constants.h"
 #include "TOFrPicoDst.h"
+#include "tofGenerator.h"
+#include "dedxGenerator.h"
 #include <vector>
 
 // clock_t, clock, CLOCKS_PER_SEC 
@@ -13,7 +15,10 @@
 
 // for testing if stdout is interactive or pipe / file
 #include "xmlConfig.h"
-#include "utils.h"
+#include "jdbUtils.h"
+
+using namespace jdbUtils;
+
 #include "reporter.h"
 
 
@@ -58,6 +63,11 @@ private:
 	static const string inverseBeta;
 	static const string deltaBeta;
 	double inverseBetaSigma;
+	tofGenerator * tofGen;
+
+	double dedxSigma;
+	dedxGenerator * dedxGen;
+
 
 public:
 
@@ -133,6 +143,9 @@ protected:
 			return constants::piMass;
 		return -10.0;	
 	}
+
+	void autoViewport( 	double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 
+						double tofPadding = 1, double dedxPadding = 1, double tofScaledPadding = 0, double dedxScaledPadding = 0 );
 
 
 	/*

@@ -5,7 +5,8 @@
 #include "histoBook.h"
 #include "constants.h"
 #include "xmlConfig.h"
-#include "utils.h"
+#include "jdbUtils.h"
+using namespace jdbUtils;
 #include "reporter.h"
 #include <vector>
 // clock_t, clock, CLOCKS_PER_SEC 
