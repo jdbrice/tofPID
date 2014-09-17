@@ -6,7 +6,7 @@ source = .cpp
 # object files to make
 objects = pid.o histoBook.o chainLoader.o pidHistogramMaker.o \
 			reporter.o TOFrPicoDst.o dklMinimizer.o  \
-			pidFitter.o multiGaussianFit.o
+			pidFitter.o multiGaussianFit.o pidFitRunner.o
 
 sources = $(wildcard *.cpp)
 headers = $(wildcard ../include/*.h)

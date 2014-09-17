@@ -7,7 +7,7 @@
 #include "pidHistogramMaker.h"
 #include "chainLoader.h"
 
-#include "pidFitter.h"
+#include "pidFitRunner.h"
 
 
 
@@ -40,7 +40,7 @@ int main( int argc, char* argv[] ) {
 
         } else if ( "fit" == jt ) {
 
-            pidFitter * pid = new pidFitter( &config );
+            pidFitRunner * pid = new pidFitRunner( &config );
             pid->runFit();
             delete pid;
 

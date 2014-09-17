@@ -1,6 +1,3 @@
 #!/usr/bin/env bash
 
-cd ../src
-make
-cd ../bin
-./pid config.xml
+./pid cHistogram.xml

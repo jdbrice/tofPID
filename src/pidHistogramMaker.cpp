@@ -1,4 +1,3 @@
-
 #include "constants.h"
 #include "pidHistogramMaker.h"
 #include "histoBook.h"
@@ -11,6 +10,11 @@ using namespace jdbUtils;
 
 const string pidHistogramMaker::inverseBeta = "inverseBeta";
 const string pidHistogramMaker::deltaBeta = "deltaBeta";
+
+const string pidHistogramMaker::traditionalCentering = "traditional";
+const string pidHistogramMaker::nonlinearCentering = "nonlinear";
+
+const vector<string> pidHistogramMaker::species = {"Pi","K","P"};
 
 /**
  * Constructor - Initializes all of the pidHistogram parameters from the configuration file
@@ -60,11 +64,16 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	vOffsetX = config->getDouble( "cut.vOffset:x", 0 );
 	vOffsetY = config->getDouble( "cut.vOffset:y", 0 );
 
-	inverseBetaSigma = config->getDouble( "binning.invBetaSigma", 0.012 );
-	dedxSigma = config->getDouble( "binning.dedxSigma", 0.012 );
+	inverseBetaSigma = config->getDouble( "centering.sigma:tof", 0.012 );
+	dedxSigma = config->getDouble( "centering.sigma:dedx", 0.06        );      
+	
 	// for centering only
 	tofGen = new tofGenerator( inverseBetaSigma );
 	dedxGen = new dedxGenerator(  );
+
+	centeringMethod = config->getString( "centering.mode", traditionalCentering );
+	tofShift = config->getDouble( "centering.globalShift:tof", 0.0 );
+	dedxShift = config->getDouble( "centering.globalShift:dedx", 0.0 );
 }
 
 /**
@@ -430,7 +439,7 @@ void pidHistogramMaker::makePidHistograms() {
     		if ( !keepTrackQA( iHit ) )
 	    		continue;
   		
-    		double p = pico->p[ iHit ];
+    		double p = pico->pt[ iHit ];
 
     		// compute centered distributions for each particle type
     		for ( int i = 0; i < parts.size(); i++ ){
@@ -439,10 +448,10 @@ void pidHistogramMaker::makePidHistograms() {
     			// collect variables 
 				int charge = pico->charge[ iHit ];
 				double eta = pico->eta[ iHit ];
-				double dedx = nSigDedx( pType, iHit );
+				double dedx = nSigDedx( pType, iHit ) - dedxShift;
 				
 				// Configuration allows you to choose between these two metrics
-				double invBeta = nSigInvBeta( pType, iHit);
+				double invBeta = nSigInvBeta( pType, iHit) - tofShift;
 				double deltaB = dBeta( pType, iHit );
 				double tof = invBeta;
 				if ( tofMetric == deltaBeta )
@@ -456,9 +465,28 @@ void pidHistogramMaker::makePidHistograms() {
 				if ( deltaB >= tofMax || deltaB <= tofMin )
 					continue;
 
+				
+
 				// get and fill the histogram for this pType and charge
 				string name = "nSig_" + speciesName( pType, charge );
 				TH3* h3 = ((TH3*)book->get( name ));
+
+				// get pBin;
+				double avgP = 0;
+				if ( h3 ){
+					int pBin = h3->GetZaxis()->FindBin( p );
+					if ( pBin > 0 && pBin < pBins.size() )
+						avgP = (pBins[ pBin ] + pBins[ pBin - 1 ] ) / 2.0;
+				}
+
+				/**
+				 * Switch centering methods
+				 */
+				if (  nonlinearCentering == centeringMethod ){
+					dedx = nSigmaDedx( pType, iHit, avgP ) - dedxShift;
+					tof = nSigmaInverseBeta( pType, iHit, avgP ) - tofShift;
+				}
+
 				if ( h3 ){
 					h3->Fill( dedx, tof, p );
 				}
@@ -480,7 +508,8 @@ void pidHistogramMaker::makePidHistograms() {
 	// make particle type reports
 	for ( int i = 0; i < parts.size(); i++ ){
 		//speciesReport( parts[ i ], -1 );
-		speciesReport( parts[ i ], 0 );
+		//speciesReport( parts[ i ], 0 );
+		distributionReport( parts[ i ] );
 		//speciesReport( parts[ i ], 1 );
 	}
 
@@ -627,7 +656,7 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 		
 		if ( i > 0 && tofMetric == inverseBeta ){
 			double tofLow, tofHigh, dedxLow, dedxHigh;
-			autoViewport( p, &tofLow, &tofHigh, &dedxLow, &dedxHigh, tofPadding, dedxPadding, tofScalePadding, dedxScalePadding );
+			autoViewport( pType, p, &tofLow, &tofHigh, &dedxLow, &dedxHigh, tofPadding, dedxPadding, tofScalePadding, dedxScalePadding );
 		
 			proj->GetYaxis()->SetRangeUser( tofLow, tofHigh );
 			proj->GetXaxis()->SetRangeUser( dedxLow, dedxHigh );
@@ -679,31 +708,116 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 
 	
 
+} 
+
+void pidHistogramMaker::distributionReport( string pType ){
+
+
+	histoBook * dBook = new histoBook( pType + "data.root", config );
+	string name = speciesName( pType, 0 );
+
+	cout << "\tSpecies Report : " << name << endl;
+
+	uint nBinsP = pBins.size();
+	
+
+	TH3 * h3 = book->get3D( "nSig_" + name );
+
+	taskProgress tp( pType + " distribution report", nBinsP );
+
+	for ( uint i = 0; i < nBinsP; i ++ ){
+
+		tp.showProgress( i );
+
+		// momentum value used for finding nice range
+		double p = pBins[ i ];
+
+
+		pReport[ name ]->newPage( 2, 2 );
+		h3->GetZaxis()->SetRange( i, i );
+		
+		TH2* proj;
+		TH1* proj1D;
+
+		proj = (TH2*)h3->Project3D( "xy" );
+
+		proj->GetYaxis()->SetRange( -1, -1 );		
+		TH1* hTof = proj->ProjectionX();
+		
+
+
+		dBook->add( "tof_"+ts(i), (TH1*)hTof->Clone( ("tof_"+ts(i)).c_str()  ) );
+		dBook->style( "tof_"+ts(i) )->set( "style.tof" )->draw();
+
+		//hTof->Draw( "h" );
+
+		pReport[ name ]->cd( 2, 1 );
+
+		TH2* proj2 = (TH2*)proj->Clone( "proj2");
+		int y1 = proj2->GetYaxis()->FindBin( -1 );
+		int y2 = proj2->GetYaxis()->FindBin( 1 );
+
+		proj2->GetYaxis()->SetRange( y1, y2 );
+		TH1* hTofEnhanced = proj2->ProjectionX( "_px" );
+		dBook->add( "tof_" + pType + ts(i), (TH1*)hTofEnhanced->Clone( ("tof_" + pType + ts(i)).c_str()  ) );
+		dBook->style( "tof_" + pType + ts(i) )->set( "style.tof" )->draw();
+		
+
+		pReport[ name ]->savePage();
+
+	}
+
+	delete dBook;
+
+
 }
 
-void pidHistogramMaker::autoViewport( 	double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 
+void pidHistogramMaker::autoViewport( 	string pType, 
+										double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 
 										double tofPadding, double dedxPadding, double tofScaledPadding, double dedxScaledPadding  ){
 
 
-	// tof Means
-	double tofMeanP = tofGen->mean( p, constants::protonMass );
-	double tofMeanK = tofGen->mean( p, constants::kaonMass );
-	double tofMeanPi = tofGen->mean( p, constants::piMass );
+	double tofCenter = tofGen->mean( p, eMass( pType ) );
+	double dedxCenter = TMath::Log10( dedxGen->mean( p, eMass( pType ) ) );
 
-	// dedx Means
-	double dedxMeanP = TMath::Log10(dedxGen->mean( p, constants::protonMass ));
-	double dedxMeanK = TMath::Log10(dedxGen->mean( p, constants::kaonMass ));
-	double dedxMeanPi = TMath::Log10(dedxGen->mean( p, constants::piMass ));
+	vector<double> tofMean;
+	vector<double> dedxMean;
+
+	for ( int i = 0; i < species.size(); i ++ ){
+		tofMean.push_back(  tofGen->mean( p, eMass( species[ i ] ) ) );
+		dedxMean.push_back( TMath::Log10( dedxGen->mean( p, eMass( species[ i ] ) ) ) );
+	}
+
+	double tHigh = (tofMean[ 0 ] - tofCenter);
+	double tLow = (tofMean[ 0 ] - tofCenter);
+	double dHigh = (dedxMean[ 0 ] - dedxCenter);
+	double dLow = (dedxMean[ 0 ] - dedxCenter);
+	for ( int i = 0; i < species.size(); i++ ){
+		if ( (tofMean[ i ] - tofCenter) > tHigh )
+			tHigh = (tofMean[ i ] - tofCenter);
+		if ( (tofMean[ i ] - tofCenter) < tLow )
+			tLow = (tofMean[ i ] - tofCenter);
+
+		if ( (dedxMean[ i ] - dedxCenter) > dHigh )
+			dHigh = (dedxMean[ i ] - dedxCenter);
+		if ( (dedxMean[ i ] - dedxCenter) < dLow )
+			dLow = (dedxMean[ i ] - dedxCenter);
+	}
+	
+	
 
 
-	*tofHigh = (( tofMeanP - tofMeanK ) / inverseBetaSigma) + tofPadding;
-	*tofLow = (( tofMeanPi - tofMeanK ) / inverseBetaSigma) - tofPadding;
+	*tofHigh = ( tHigh  / inverseBetaSigma) + tofPadding;
+	*tofLow = ( tLow / inverseBetaSigma) - tofPadding;
 
-	*dedxHigh = (( dedxMeanP - dedxMeanK ) / dedxSigma) + dedxPadding;
-	*dedxLow = (( dedxMeanPi - dedxMeanK ) / dedxSigma) - dedxPadding;
+	*dedxHigh = ( dHigh / dedxSigma) + dedxPadding;
+	*dedxLow = ( dLow / dedxSigma) - dedxPadding;
 
-	double scaledPaddingTof = (*tofHigh - *tofLow ) * tofScaledPadding;
-	double scaledPaddingDedx = (*dedxHigh - *dedxLow ) * dedxScaledPadding;
+	double tofRange = *tofHigh - *tofLow;
+	double dedxRange = *dedxHigh - *dedxLow;
+
+	double scaledPaddingTof = tofRange * tofScaledPadding;
+	double scaledPaddingDedx = dedxRange * dedxScaledPadding;
 
 	*tofLow -= scaledPaddingTof;
 	*tofHigh += scaledPaddingTof;
@@ -726,8 +840,124 @@ void pidHistogramMaker::autoViewport( 	double p, double * tofLow, double* tofHig
 }
 
 
+double pidHistogramMaker::nSigDedx( string pType, int iHit ){ 
+			
+	double p = pico->p[ iHit ];
+	double mean = TMath::Log10( dedxGen->mean( p, eMass( pType ) ) * 1000 );
+	double dedx = TMath::Log10(pico->dedx[ iHit ]);
+	double nSig = (( dedx - mean ) / dedxSigma );
+
+	return nSig;
+
+	return -999.0;
+}
+
+double pidHistogramMaker::nSigmaDedx( string pType, int iHit, double avgP ){
+
+	double p = pico->p[ iHit ];
+	double dedx = TMath::Log10( pico->dedx[ iHit ] );
+	//cout << "\tdedx = " << dedx << endl;
+
+	// mean for this species
+	double mu = TMath::Log10( dedxGen->mean( p, eMass( pType ) ) * 1000 );
+	double muAvg = TMath::Log10( dedxGen->mean( avgP, eMass( pType ) ) * 1000 );
+	//cout << "\tmu = " << mu << endl;
+
+	vector< string > species = { "K", "P", "Pi" };
+
+	double n1 = 0, n2 = 0;
+	double d1 = 0, d2 = 0;
+	for ( int i = 0; i < species.size(); i++ ){
+
+		double iMu = TMath::Log10( dedxGen->mean( p, eMass( species[ i ] ) ) * 1000 );
+		double iMuAvg = TMath::Log10( dedxGen->mean( avgP, eMass( species[ i ] ) ) * 1000 );
+		// may improve
+		double sigma = dedxSigma; 
+
+		double iL = lh( dedx, iMu, sigma );
+		//cout << " iL " + species[ i ] + " " << iL << endl;
+		double w = dedx + iMuAvg - iMu;
+		
+
+		n1 += (iL * w);
+		d1 += iL;
+
+		double iLc = lh( mu, iMu, sigma );
+		n2 += (iLc * w);
+		d2 += iLc;
+	}
+
+	//cout << "\tn1 = " << n1 << endl;
+	//cout << "\td1 = " << d1 << endl;
+	//cout << "\tn2 = " << n2 << endl;
+	//cout << "\td2 = " << d2 << endl;
+
+	double p1 = (n1/d1);
+	double p2 = (n2/d2);
+	//cout << "\tp1 = " << p1 << endl;
+	//cout << "\tp2 = " << p2 << endl;
+	double nSig = (n1/d1) - muAvg;
+
+	return (nSig / dedxSigma);
+
+}
+
+double pidHistogramMaker::nSigmaInverseBeta( string pType, int iHit, double avgP ){
+
+	double p = pico->p[ iHit ];
+	double tof = 1.0 /  pico->beta[ iHit ];
+	
+
+	// mean for this species
+	double mu =  tofGen->mean( p, eMass( pType ) );
+	double muAvg =  tofGen->mean( avgP, eMass( pType ) );
+	//cout << "\tmu = " << mu << endl;
+
+	vector< string > species = { "K", "P", "Pi" };
+
+	double n1 = 0, n2 = 0;
+	double d1 = 0, d2 = 0;
+
+	for ( int i = 0; i < species.size(); i++ ){
+
+		double iMu =  tofGen->mean( p, eMass( species[ i ] ) ) ;
+		double iMuAvg =  tofGen->mean( avgP, eMass( species[ i ] ) ) ;
+		
+		double sigma = inverseBetaSigma; 
+
+		double iL = lh( tof, iMu, sigma );
+		
+		double w = tof + iMuAvg - iMu;
+		
+		n1 += (iL * w);
+		d1 += iL;
+
+		double iLc = lh( mu, iMu, sigma );
+		n2 += (iLc * w);
+		d2 += iLc;
+	}
 
 
+
+	double p1 = (n1/d1);
+	double p2 = (n2/d2);
+	
+	double nSig = (n1/d1) - muAvg;
+
+	return (nSig /  inverseBetaSigma);
+
+}
+
+
+double pidHistogramMaker::lh( double x, double mu, double sigma ){
+
+	double a = sigma * TMath::Sqrt( 2 * TMath::Pi() );
+	double b = ( x - mu );
+	double c = 2 * sigma*sigma;
+	double d = (1/a) * TMath::Exp( -b*b / c );
+
+	return d;
+}
 
 
 

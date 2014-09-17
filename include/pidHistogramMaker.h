@@ -68,6 +68,14 @@ private:
 	double dedxSigma;
 	dedxGenerator * dedxGen;
 
+	string centeringMethod;
+	double dedxShift;
+	double tofShift;
+	static const string traditionalCentering;
+	static const string nonlinearCentering;
+
+	static const vector<string> species;
+
 
 public:
 
@@ -92,16 +100,13 @@ protected:
 	void prepareHistograms( string pType );
 	string speciesName( string pType, int charge );
 	void speciesReport( string pType, int charge, int etaBin = -1 );
+	void distributionReport( string pType );
 
-	double nSigDedx( string pType, int iHit ) { 
-		if ( "P" == pType )
-			return pico->nSigP[ iHit ];
-		if ( "K" == pType )
-			return pico->nSigK[ iHit ];
-		if ( "Pi" == pType )
-			return pico->nSigPi[ iHit ];
-		return -999.0;
-	}
+	double nSigDedx( string pType, int iHit ); 
+	double nSigmaDedx( string pType, int iHit, double avgP );
+
+	double lh( double t, double mu, double sigma );
+
 	double nSigInvBeta( string pType, int iHit  ){
 
 		double betaMeasured = pico->beta[ iHit ];
@@ -112,13 +117,15 @@ protected:
 
 		return (deltaInvBeta / inverseBetaSigma);
 	}
+	double nSigmaInverseBeta( string pType, int iHit, double avgP );
+
 	double dBeta( string pType, int iHit  ){
 
-		double tof = pico->tof[ iHit ];
+		//double tof = pico->tof[ iHit ];
 		double length = pico->length[ iHit ];
 		double p = pico->p[ iHit ];
 		double beta = pico->beta[ iHit ];
-		double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
+		//double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );
 
 
 		double deltaB = 1 - (beta) * TMath::Sqrt( (constants::kaonMass*constants::kaonMass) / (p*p) + 1 );
@@ -144,7 +151,7 @@ protected:
 		return -10.0;	
 	}
 
-	void autoViewport( 	double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 
+	void autoViewport( 	string pType, double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 
 						double tofPadding = 1, double dedxPadding = 1, double tofScaledPadding = 0, double dedxScaledPadding = 0 );
 
 

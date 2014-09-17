@@ -18,6 +18,7 @@
 /bin/*.xml
 /bin/pid
 /bin/histogram/
+/bin/gaussFit/
 /bin/rFit/
 /bin/QA/
 # but keep the sample config
