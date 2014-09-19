@@ -2,6 +2,8 @@
 #include "pidHistogramMaker.h"
 #include "histoBook.h"
 
+#include "TLine.h"
+
 #include <fstream>
 #include <sstream>
 
@@ -74,6 +76,12 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	centeringMethod = config->getString( "centering.mode", traditionalCentering );
 	tofShift = config->getDouble( "centering.globalShift:tof", 0.0 );
 	dedxShift = config->getDouble( "centering.globalShift:dedx", 0.0 );
+
+	// for putting nice ranges on plots
+	tofPadding = config->getDouble( "binning.tof:padding", 5 );
+	dedxPadding = config->getDouble( "binning.dedx:padding", 5 );
+	tofScalePadding = config->getDouble( "binning.tof:paddingScale", .05 );
+	dedxScalePadding = config->getDouble( "binning.dedx:paddingScale", .05 );
 }
 
 /**
@@ -398,7 +406,61 @@ TGraph * pidHistogramMaker::inverseBetaGraph( double m, double p1, double p2, do
 
 }
 
+void pidHistogramMaker::momentumDistributions() {
 
+	book->make( "histograms.momentum" );
+
+	Int_t nevents = (Int_t)_chain->GetEntries();
+	cout << "[pidHistogramMaker." << __FUNCTION__ << "] Loaded: " << nevents << " events " << endl;
+
+	book->cd( "" );
+
+	vector<string> parts = config->getStringVector( "pType" );
+
+	for ( int i = 0; i < parts.size(); i++ ){
+		prepareHistograms( parts[ i ] );
+	}
+
+	taskProgress tp( "Making Pid Histograms", nevents );
+	// loop over all events to produce the histograms
+	for(Int_t i=0; i<nevents; i++) {
+    	_chain->GetEntry(i);
+
+    	// report progress
+    	tp.showProgress( i );
+
+    	// use the QA event cuts
+    	if ( !keepEventQA() )
+    		continue;
+    	
+    	// Loop over all tof hits
+    	int nTofHits = pico->nTofHits;
+    	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
+
+    		// Use the QA Track cuts
+    		if ( !keepTrackQA( iHit ) )
+	    		continue;
+  		
+    		double pt = pico->pt[ iHit ];
+    		double p = pico->pt[ iHit ];
+
+			string pType = parts[ 0 ];
+			
+			// check the limits so we dont process more than we need to
+			if ( pt > pMax || pt < pMin )
+				continue;
+
+			// get and fill the histogram for this pType and charge
+			string name = "nSig_" + speciesName( pType, charge );
+			TH3* h3 = ((TH3*)book->get( name ));
+			
+			int ptBin = h3->GetZaxis()->FindBin( pt );
+			book->
+		}
+	}
+
+
+}
 
 
 void pidHistogramMaker::makePidHistograms() {
@@ -617,12 +679,6 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 
 	taskProgress tp( pType + " report", nBinsP );
 
-	// for putting nice ranges on plots
-	double tofPadding = config->getDouble( "binning.tof:padding", 5 );
-	double dedxPadding = config->getDouble( "binning.dedx:padding", 5 );
-	double tofScalePadding = config->getDouble( "binning.tof:paddingScale", .05 );
-	double dedxScalePadding = config->getDouble( "binning.dedx:paddingScale", .05 );
-
 	for ( uint i = 0; i < nBinsP; i ++ ){
 
 		tp.showProgress( i );
@@ -714,6 +770,7 @@ void pidHistogramMaker::distributionReport( string pType ){
 
 
 	histoBook * dBook = new histoBook( pType + "data.root", config );
+
 	string name = speciesName( pType, 0 );
 
 	cout << "\tSpecies Report : " << name << endl;
@@ -732,35 +789,43 @@ void pidHistogramMaker::distributionReport( string pType ){
 		// momentum value used for finding nice range
 		double p = pBins[ i ];
 
-
+		// start a new page on the report file
 		pReport[ name ]->newPage( 2, 2 );
-		h3->GetZaxis()->SetRange( i, i );
+
+		// get the h3 and set the current p bin range
+		h3->GetZaxis()->SetRange( i, i );	
+
+		// get the 2D projection in dedx X tof space
+		TH2* proj = (TH2*)h3->Project3D( "xy" );
+
+		// get information on plot ranges
+		double tofLow, tofHigh, dedxLow, dedxHigh;
+		autoViewport( pType, p, &tofLow, &tofHigh, &dedxLow, &dedxHigh, tofPadding, dedxPadding, tofScalePadding, dedxScalePadding );
 		
-		TH2* proj;
-		TH1* proj1D;
-
-		proj = (TH2*)h3->Project3D( "xy" );
-
-		proj->GetYaxis()->SetRange( -1, -1 );		
+		// Make the all tof tracks histogram
 		TH1* hTof = proj->ProjectionX();
-		
-
-
 		dBook->add( "tof_"+ts(i), (TH1*)hTof->Clone( ("tof_"+ts(i)).c_str()  ) );
-		dBook->style( "tof_"+ts(i) )->set( "style.tof" )->draw();
+		dBook->style( "tof_"+ts(i) )->set( "style.tof" ) 	
+			 ->set("domain", tofLow, tofHigh )->draw();
 
-		//hTof->Draw( "h" );
+		double yMax = hTof->GetMaximum();
+		double piMean = (tofGen->mean( p, eMass( "Pi" ) ) - tofGen->mean( p, eMass( pType ) ) ) / inverseBetaSigma;
+		TLine * l1 = new TLine( piMean, 0, piMean, yMax );
+		l1->Draw();
 
+		// Make the enhanced histogram for the center species
 		pReport[ name ]->cd( 2, 1 );
-
 		TH2* proj2 = (TH2*)proj->Clone( "proj2");
 		int y1 = proj2->GetYaxis()->FindBin( -1 );
 		int y2 = proj2->GetYaxis()->FindBin( 1 );
 
+		// sets the rnge to effect the cut in dedx space
 		proj2->GetYaxis()->SetRange( y1, y2 );
 		TH1* hTofEnhanced = proj2->ProjectionX( "_px" );
+
 		dBook->add( "tof_" + pType + ts(i), (TH1*)hTofEnhanced->Clone( ("tof_" + pType + ts(i)).c_str()  ) );
-		dBook->style( "tof_" + pType + ts(i) )->set( "style.tof" )->draw();
+		dBook->style( "tof_" + pType + ts(i) )->set( "style.tof" )
+			 ->set("domain", tofLow, tofHigh )->draw();
 		
 
 		pReport[ name ]->savePage();

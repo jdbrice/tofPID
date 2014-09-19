@@ -76,6 +76,9 @@ private:
 
 	static const vector<string> species;
 
+	// for padding plot ranges
+	double tofPadding, dedxPadding;
+	double tofScalePadding, dedxScalePadding;
 
 public:
 
@@ -97,6 +100,7 @@ public:
 
 protected:
 
+	void momentumDistributions();
 	void prepareHistograms( string pType );
 	string speciesName( string pType, int charge );
 	void speciesReport( string pType, int charge, int etaBin = -1 );
