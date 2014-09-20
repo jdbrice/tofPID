@@ -4,9 +4,8 @@ project = pid
 # source suffix
 source = .cpp 
 # object files to make
-objects = pid.o  
-#			\ pidHistogramMaker.o \
-#			reporter.o TOFrPicoDst.o 
+objects = pid.o pidHistogramMaker.o TOFrPicoDst.o \
+#			reporter.o 
 
 sources = $(wildcard *.cpp)
 headers = $(wildcard ../include/*.h)
@@ -19,7 +18,7 @@ ROOTGLIBS     	= $(shell root-config --glibs)
 
 # Custom Project includes and libs
 includes		= -I../include -I. -I$(ROOTSYS)/include -I$(ROOTDEV)/include 
-libraries 		= 	$(ROOTLIBS) -lGui -lHtml -lGuiHtml -lRooFitCore -lRooFit $(CERNLIBS) $(SYSLIBS) \
+libraries 		= 	$(ROOTLIBS) -lGui -lHtml -lGuiHtml -lRooFitCore -lRooFit $(CERNLIBS) $(SYSLIBS)
 staticLibs 		= jdbREF.a
 
 

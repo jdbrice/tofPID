@@ -3,7 +3,7 @@
 
 #include "allroot.h"
 
-#include "histoBook.h"
+#include "HistoBook.h"
 #include "constants.h"
 #include "TOFrPicoDst.h"
 #include "tofGenerator.h"
@@ -14,10 +14,10 @@
 #include <time.h>       
 
 // for testing if stdout is interactive or pipe / file
-#include "xmlConfig.h"
-#include "jdbUtils.h"
+#include "XmlConfig.h"
+#include "Utils.h"
 
-using namespace jdbUtils;
+using namespace jdb;
 
 #include "reporter.h"
 
@@ -27,24 +27,24 @@ class pidHistogramMaker{
 private:
 
 	// the canvas used to draw report hidtos
-	reporter* report;
+	Reporter* report;
 
 	
 	// the main chain object
 	TChain * _chain;
 
 	// the histobook that stores all of our pidHistogramMaker histograms
-	histoBook *book;
+	HistoBook *book;
 
 	// the pico dst for simpler chain usage
 	TOFrPicoDst * pico;
 
 	// config file
-	xmlConfig* config;
+	XmlConfig* config;
 
 	clock_t startTime;
 
-	map< string, reporter * > pReport;
+	map< string, Reporter * > pReport;
 
 
 	// binning information
@@ -57,6 +57,9 @@ private:
 
 	//QA memebers
 	double vOffsetX, vOffsetY;
+
+	// have the main histograms been prepared
+	bool histosReady;
 
 	// tof Metric
 	string tofMetric;
@@ -80,15 +83,18 @@ private:
 	double tofPadding, dedxPadding;
 	double tofScalePadding, dedxScalePadding;
 
+	vector<double> averageP;
+
 public:
 
 
 	// Constructor
-	pidHistogramMaker( TChain * chain, xmlConfig *config );
+	pidHistogramMaker( TChain * chain, XmlConfig *config );
 
 	// destructor
 	~pidHistogramMaker();
 	
+	void momentumDistributions();
 	void makeQA();
 	void makePidHistograms();
 
@@ -100,9 +106,9 @@ public:
 
 protected:
 
-	void momentumDistributions();
+	
 	void prepareHistograms( string pType );
-	string speciesName( string pType, int charge );
+	string speciesName( string pType, int charge = 0);
 	void speciesReport( string pType, int charge, int etaBin = -1 );
 	void distributionReport( string pType );
 
@@ -126,7 +132,7 @@ protected:
 	double dBeta( string pType, int iHit  ){
 
 		//double tof = pico->tof[ iHit ];
-		double length = pico->length[ iHit ];
+		//double length = pico->length[ iHit ];
 		double p = pico->p[ iHit ];
 		double beta = pico->beta[ iHit ];
 		//double m2 = p*p * ( constants::c*constants::c * tof*tof / ( length*length ) - 1  );

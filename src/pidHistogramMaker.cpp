@@ -1,14 +1,12 @@
 #include "constants.h"
 #include "pidHistogramMaker.h"
-#include "histoBook.h"
+
 
 #include "TLine.h"
 
 #include <fstream>
 #include <sstream>
 
-// provides my own string shortcuts etc.
-using namespace jdbUtils;
 
 const string pidHistogramMaker::inverseBeta = "inverseBeta";
 const string pidHistogramMaker::deltaBeta = "deltaBeta";
@@ -25,7 +23,7 @@ const vector<string> pidHistogramMaker::species = {"Pi","K","P"};
  *					such as number of tot bins to use, data location etc. See repo Readme
  *					for a sample configuration.
  */
-pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
+pidHistogramMaker::pidHistogramMaker( TChain* chain, XmlConfig* con )  {
 	cout << "[pidHistogramMaker.pidHistogramMaker] " << endl;
 	
 	gErrorIgnoreLevel=kSysError ;
@@ -41,7 +39,7 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	gStyle->SetStatW( config->getDouble( "statBox.pos:w", 0.2 ) );
 	
 	// create the histogram book
-	book = new histoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config, config->getString( "input.root" ) );
+	book = new HistoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config, config->getString( "input.root" ) );
 
 	if ( true == config->nodeExists( "pType" )  ){
 		vector<string> parts = config->getStringVector( "pType" );
@@ -50,13 +48,13 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 			for ( int charge = -1; charge <= 1; charge ++ ){
 
 				string n = speciesName( parts[ i ], charge );
-				pReport[ n ] = new reporter( config->getString( "output.base" ) + n + config->getString( "output.report" ) );		
+				pReport[ n ] = new Reporter( config->getString( "output.base" ) + n + config->getString( "output.report" ) );		
 			}
 		}
 	}
 
 	// create a report builder 
-	report = new reporter( config->getString( "output.base" ) + config->getString( "output.report" ) );
+	report = new Reporter( config->getString( "output.base" ) + config->getString( "output.report" ) );
 
 
 	_chain = chain;
@@ -82,6 +80,9 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, xmlConfig* con )  {
 	dedxPadding = config->getDouble( "binning.dedx:padding", 5 );
 	tofScalePadding = config->getDouble( "binning.tof:paddingScale", .05 );
 	dedxScalePadding = config->getDouble( "binning.dedx:paddingScale", .05 );
+
+	histosReady = false;
+
 }
 
 /**
@@ -184,8 +185,8 @@ void pidHistogramMaker::makeQA() {
     		continue;
 
 
-    	double tStart = pico->tStart;
-    	Int_t refMult = pico->refMult;
+    	//double tStart = pico->tStart;
+    	//Int_t refMult = pico->refMult;
 
     
     	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
@@ -203,7 +204,7 @@ void pidHistogramMaker::makeQA() {
     		//	continue;
     		
 
-    		double le = pico->leTime[ iHit ];
+    		//double le = pico->leTime[ iHit ];
     		double length = pico->length[ iHit ];
     		double tof = pico->tof[ iHit ];
     		double beta = pico->beta[ iHit ];
@@ -349,7 +350,7 @@ bool pidHistogramMaker::keepEventQA(){
 	double vz = pico->vertexZ;
 	double vx = pico->vertexX;
 	double vy = pico->vertexY;
-	double vr = TMath::Sqrt( vx*vx + vy*vy );
+	//double vr = TMath::Sqrt( vx*vx + vy*vy );
 	double vrOff = TMath::Sqrt( (vx - vOffsetX)*(vx - vOffsetX) + (vy - vOffsetY)*(vy - vOffsetY) );
 
 	if ( TMath::Abs( vz ) > config->getDouble( "cut.vZ", 30 ) )
@@ -371,8 +372,8 @@ bool pidHistogramMaker::keepEventQA(){
 
 bool pidHistogramMaker::keepTrackQA( uint iHit ){
 
-	double p = pico->p[ iHit ];
-	double nHits = pico->nHits[ iHit ];
+	//double p = pico->p[ iHit ];
+	//double nHits = pico->nHits[ iHit ];
 	double eta = pico->eta[ iHit ];
 
 	if ( TMath::Abs( eta ) > .20 )
@@ -408,20 +409,23 @@ TGraph * pidHistogramMaker::inverseBetaGraph( double m, double p1, double p2, do
 
 void pidHistogramMaker::momentumDistributions() {
 
-	book->make( "histograms.momentum" );
+	vector<string> parts = config->getStringVector( "pType" );
+	if ( false == histosReady ){
+		
+		for ( int i = 0; i < parts.size(); i++ ){
+			prepareHistograms( parts[ i ] );
+		}
+	}
+
+
+	book->makeAll( "histograms" );
 
 	Int_t nevents = (Int_t)_chain->GetEntries();
 	cout << "[pidHistogramMaker." << __FUNCTION__ << "] Loaded: " << nevents << " events " << endl;
 
-	book->cd( "" );
+	
 
-	vector<string> parts = config->getStringVector( "pType" );
-
-	for ( int i = 0; i < parts.size(); i++ ){
-		prepareHistograms( parts[ i ] );
-	}
-
-	taskProgress tp( "Making Pid Histograms", nevents );
+	taskProgress tp( "Filling Momentum distributions", nevents );
 	// loop over all events to produce the histograms
 	for(Int_t i=0; i<nevents; i++) {
     	_chain->GetEntry(i);
@@ -437,28 +441,36 @@ void pidHistogramMaker::momentumDistributions() {
     	int nTofHits = pico->nTofHits;
     	for ( int iHit = 0; iHit < nTofHits; iHit++ ){
 
+    		double eta = pico->eta[ iHit ];
+    		double pt = pico->pt[ iHit ];
+    		double p = pico->p[ iHit ];
+    		
+			string pType = parts[ 0 ];
+			
+			book->fill( "eta", eta );
+			book->fill( "momentum", p );
+			book->fill( "momentumTransverse", pt );
+    		
     		// Use the QA Track cuts
     		if ( !keepTrackQA( iHit ) )
 	    		continue;
-  		
-    		double pt = pico->pt[ iHit ];
-    		double p = pico->pt[ iHit ];
-
-			string pType = parts[ 0 ];
-			
-			// check the limits so we dont process more than we need to
-			if ( pt > pMax || pt < pMin )
-				continue;
-
-			// get and fill the histogram for this pType and charge
-			string name = "nSig_" + speciesName( pType, charge );
-			TH3* h3 = ((TH3*)book->get( name ));
-			
-			int ptBin = h3->GetZaxis()->FindBin( pt );
-			book->
+	    	
+  			
+			book->fill( "pVsPt", pt, p);
 		}
 	}
 
+	// loop through the pt bins
+	for ( int ip = 0; ip < pBins.size()-1; ip++ ){
+		TH2* h2 = book->get2D( "pVsPt" );
+		if ( h2 ){
+			h2->GetXaxis()->SetRange( ip+1, ip+1 );
+			double avgP = h2->GetMean( 2 );
+			cout << " <p[ " << ip << " ]> = " << avgP << endl; 
+			averageP.push_back( avgP );
+		}
+	}
+	
 
 }
 
@@ -532,6 +544,10 @@ void pidHistogramMaker::makePidHistograms() {
 				// get and fill the histogram for this pType and charge
 				string name = "nSig_" + speciesName( pType, charge );
 				TH3* h3 = ((TH3*)book->get( name ));
+
+				//int ptBin = HistoBook::findBin( pBins, pt );
+				//double avgP = averageP[ ptBin ];
+				//cout << " <p[ " << ptBin << " ] > = " << avgP << endl;
 
 				// get pBin;
 				double avgP = 0;
@@ -661,7 +677,7 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 		book->add( name, h3 );
 	}
 	
-
+	histosReady = true;
 
 }
 
@@ -769,7 +785,7 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 void pidHistogramMaker::distributionReport( string pType ){
 
 
-	histoBook * dBook = new histoBook( pType + "data.root", config );
+	HistoBook * dBook = new HistoBook( pType + "data.root", config );
 
 	string name = speciesName( pType, 0 );
 
@@ -819,7 +835,7 @@ void pidHistogramMaker::distributionReport( string pType ){
 		int y1 = proj2->GetYaxis()->FindBin( -1 );
 		int y2 = proj2->GetYaxis()->FindBin( 1 );
 
-		// sets the rnge to effect the cut in dedx space
+		// sets the range to effect the cut in dedx space
 		proj2->GetYaxis()->SetRange( y1, y2 );
 		TH1* hTofEnhanced = proj2->ProjectionX( "_px" );
 
@@ -957,8 +973,6 @@ double pidHistogramMaker::nSigmaDedx( string pType, int iHit, double avgP ){
 	//cout << "\tn2 = " << n2 << endl;
 	//cout << "\td2 = " << d2 << endl;
 
-	double p1 = (n1/d1);
-	double p2 = (n2/d2);
 	//cout << "\tp1 = " << p1 << endl;
 	//cout << "\tp2 = " << p2 << endl;
 	double nSig = (n1/d1) - muAvg;
@@ -1002,10 +1016,6 @@ double pidHistogramMaker::nSigmaInverseBeta( string pType, int iHit, double avgP
 		d2 += iLc;
 	}
 
-
-
-	double p1 = (n1/d1);
-	double p2 = (n2/d2);
 	
 	double nSig = (n1/d1) - muAvg;
 
