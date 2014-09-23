@@ -38,6 +38,8 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, XmlConfig* con )  {
 	gStyle->SetStatH( config->getDouble( "statBox.pos:h", 0.2 ) );
 	gStyle->SetStatW( config->getDouble( "statBox.pos:w", 0.2 ) );
 	
+
+	distroData = new TFile( "distros.root", "RECREATE" );
 	// create the histogram book
 	book = new HistoBook( ( config->getString( "output.base" ) + config->getString( "output.root" ) ), config, config->getString( "input.root" ) );
 
@@ -466,7 +468,7 @@ void pidHistogramMaker::momentumDistributions() {
 		if ( h2 ){
 			h2->GetXaxis()->SetRange( ip+1, ip+1 );
 			double avgP = h2->GetMean( 2 );
-			cout << " <p[ " << ip << " ]> = " << avgP << endl; 
+			//cout << " <p[ " << ip << " ]> = " << avgP << endl; 
 			averageP.push_back( avgP );
 		}
 	}
@@ -513,7 +515,7 @@ void pidHistogramMaker::makePidHistograms() {
     		if ( !keepTrackQA( iHit ) )
 	    		continue;
   		
-    		double p = pico->pt[ iHit ];
+    		double pt = pico->pt[ iHit ];
 
     		// compute centered distributions for each particle type
     		for ( int i = 0; i < parts.size(); i++ ){
@@ -532,12 +534,12 @@ void pidHistogramMaker::makePidHistograms() {
 					tof = deltaB;
 				
 				// check the limits so we dont process more than we need to
-				if ( p > pMax || p < pMin )
+				if ( pt > pMax || pt < pMin )
 					continue;
-				if ( dedx >= dedxMax || dedx <= dedxMin )
-					continue;
-				if ( deltaB >= tofMax || deltaB <= tofMin )
-					continue;
+				//if ( dedx >= dedxMax || dedx <= dedxMin )
+				//	continue;
+				//if ( deltaB >= tofMax || deltaB <= tofMin )
+				//	continue;
 
 				
 
@@ -545,17 +547,17 @@ void pidHistogramMaker::makePidHistograms() {
 				string name = "nSig_" + speciesName( pType, charge );
 				TH3* h3 = ((TH3*)book->get( name ));
 
-				//int ptBin = HistoBook::findBin( pBins, pt );
-				//double avgP = averageP[ ptBin ];
-				//cout << " <p[ " << ptBin << " ] > = " << avgP << endl;
+				int ptBin = HistoBook::findBin( pBins, pt );
+				double avgP = averageP[ ptBin ];
+				//avgP = (pBins[ ptBin ] + pBins[ ptBin - 1 ] ) / 2.0;
 
 				// get pBin;
-				double avgP = 0;
+				/*double avgP = 0;
 				if ( h3 ){
 					int pBin = h3->GetZaxis()->FindBin( p );
 					if ( pBin > 0 && pBin < pBins.size() )
 						avgP = (pBins[ pBin ] + pBins[ pBin - 1 ] ) / 2.0;
-				}
+				}*/
 
 				/**
 				 * Switch centering methods
@@ -566,14 +568,14 @@ void pidHistogramMaker::makePidHistograms() {
 				}
 
 				if ( h3 ){
-					h3->Fill( dedx, tof, p );
+					h3->Fill( dedx, tof, pt );
 				}
 
 				// always fill the charge agnostic histogram
 				name = "nSig_" + speciesName( pType, 0 );
 				h3 = ((TH3*)book->get( name ));
 				if ( h3 ){
-					h3->Fill( dedx, tof, p );
+					h3->Fill( dedx, tof, pt );
 				}
 			
 
@@ -781,11 +783,11 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 	
 
 } 
-
+/*
 void pidHistogramMaker::distributionReport( string pType ){
 
 
-	HistoBook * dBook = new HistoBook( pType + "data.root", config );
+	
 
 	string name = speciesName( pType, 0 );
 
@@ -795,15 +797,21 @@ void pidHistogramMaker::distributionReport( string pType ){
 	
 
 	TH3 * h3 = book->get3D( "nSig_" + name );
-
+	book->cd( "scratch" );
 	taskProgress tp( pType + " distribution report", nBinsP );
 
-	for ( uint i = 0; i < nBinsP; i ++ ){
+	for ( uint i = 0; i < nBinsP - 1; i ++ ){
 
 		tp.showProgress( i );
 
 		// momentum value used for finding nice range
 		double p = pBins[ i ];
+		double p2 = pBins[ i + 1 ];
+		double avgP = 0.2;
+		if ( i >= 1 ){
+			avgP = (pBins[ i-1 ] + pBins[ i ])/2.0;
+			avgP = averageP[ i-1 ];
+		}
 
 		// start a new page on the report file
 		pReport[ name ]->newPage( 2, 2 );
@@ -818,37 +826,205 @@ void pidHistogramMaker::distributionReport( string pType ){
 		double tofLow, tofHigh, dedxLow, dedxHigh;
 		autoViewport( pType, p, &tofLow, &tofHigh, &dedxLow, &dedxHigh, tofPadding, dedxPadding, tofScalePadding, dedxScalePadding );
 		
-		// Make the all tof tracks histogram
-		TH1* hTof = proj->ProjectionX();
-		dBook->add( "tof_"+ts(i), (TH1*)hTof->Clone( ("tof_"+ts(i)).c_str()  ) );
-		dBook->style( "tof_"+ts(i) )->set( "style.tof" ) 	
-			 ->set("domain", tofLow, tofHigh )->draw();
+		if ( true ) {	// show the tof proj
+			// Make the all tof tracks histogram
+			TH1* hTof = proj->ProjectionX();
+			book->cd( "tof" );
+			book->add( "tof_"+ts(i), (TH1*)hTof->Clone( ("tof_"+ts(i)).c_str()  ) );
+			book->style( "tof_"+ts(i) )->set( "style.tof" ) 	
+				 ->set( "title", "1/#beta : " + ts(p,4) + " < P_{T} < " + ts(p2,4) )
+				 ->draw();
+				gPad->SetGrid();
+			book->cd( "scratch" );
 
-		double yMax = hTof->GetMaximum();
-		double piMean = (tofGen->mean( p, eMass( "Pi" ) ) - tofGen->mean( p, eMass( pType ) ) ) / inverseBetaSigma;
-		TLine * l1 = new TLine( piMean, 0, piMean, yMax );
-		l1->Draw();
+			double yMax = hTof->GetMaximum();
+			double piMean = (tofGen->mean( avgP, eMass( "Pi" ) ) - tofGen->mean( avgP, eMass( pType ) ) ) / inverseBetaSigma;
+			TLine * l1 = new TLine( piMean, 0, piMean, yMax );
+			l1->Draw();
 
-		// Make the enhanced histogram for the center species
-		pReport[ name ]->cd( 2, 1 );
-		TH2* proj2 = (TH2*)proj->Clone( "proj2");
-		int y1 = proj2->GetYaxis()->FindBin( -1 );
-		int y2 = proj2->GetYaxis()->FindBin( 1 );
+			// Make the enhanced histogram for the center species
+			pReport[ name ]->cd( 2, 1 );
+			TH2* proj2 = (TH2*)proj->Clone( "proj2");
+			int y1 = proj2->GetYaxis()->FindBin( -1 );
+			int y2 = proj2->GetYaxis()->FindBin( 1 );
 
-		// sets the range to effect the cut in dedx space
-		proj2->GetYaxis()->SetRange( y1, y2 );
-		TH1* hTofEnhanced = proj2->ProjectionX( "_px" );
+			// sets the range to effect the cut in dedx space
+			proj2->GetYaxis()->SetRange( y1, y2 );
+			TH1* hTofEnhanced = proj2->ProjectionX( "_px" );
 
-		dBook->add( "tof_" + pType + ts(i), (TH1*)hTofEnhanced->Clone( ("tof_" + pType + ts(i)).c_str()  ) );
-		dBook->style( "tof_" + pType + ts(i) )->set( "style.tof" )
-			 ->set("domain", tofLow, tofHigh )->draw();
+			book->cd( "tof" );
+			book->add( "tof_s0_" + ts(i), (TH1*)hTofEnhanced->Clone( ("tof_s0_" + ts(i)).c_str()  ) );
+			book->style( "tof_s0_" + ts(i) )->set( "style.tof" )
+				 ->set( "title", "1/#beta : " + ts(p,4) + " < P_{T} < " + ts(p2,4) )
+				 ->set("domain", tofLow, tofHigh )->draw();
+				 gPad->SetGrid();
+			book->cd( "scratch" );
+
+			pReport[ name ]->cd( 1, 2 );
+			TH2* proj3 = (TH2*)proj->Clone( "proj3");
+			
+			double s1Mean = (TMath::Log10( dedxGen->mean( avgP, eMass( "Pi" ) )) - TMath::Log10( dedxGen->mean( avgP, eMass( pType ) ) ) ) / dedxSigma;
+			int s1y1 = proj3->GetYaxis()->FindBin( s1Mean-1 );
+			int s1y2 = proj3->GetYaxis()->FindBin( s1Mean+1 );
+
+			// sets the range to effect the cut in dedx space
+			proj3->GetYaxis()->SetRange( s1y1, s1y2 );
+			TH1* hTofS1Enhanced = proj3->ProjectionX( "_px" );
+
+			book->cd( "tof" );
+			book->add( "tof_s1_" + ts(i), (TH1*)hTofS1Enhanced->Clone( ("tof_s1_" + ts(i)).c_str()  ) );
+			book->style( "tof_s1_"  + ts(i) )->set( "style.tof" )
+			 	 ->set( "title", "1/#beta : " + ts(p,4) + " < P_{T} < " + ts(p2,4) )
+				 ->set("domain", tofLow, tofHigh )->draw();
+				 gPad->SetGrid();
+			book->cd( "scratch" );
+
+			pReport[ name ]->cd( 2, 2 );
+			
+			double s2Mean = (TMath::Log10( dedxGen->mean( avgP, eMass( "P" ) )) - TMath::Log10( dedxGen->mean( avgP, eMass( pType ) ) ) ) / dedxSigma;
+			int s2y1 = proj3->GetYaxis()->FindBin( s2Mean-1 );
+			int s2y2 = proj3->GetYaxis()->FindBin( s2Mean+1 );
+
+			// sets the range to effect the cut in dedx space
+			proj3->GetYaxis()->SetRange( s2y1, s2y2 );
+			TH1* hTofS2Enhanced = proj3->ProjectionX( "_px" );
+
+			book->cd( "tof" );
+			book->add( "tof_s2_" + ts(i), (TH1*)hTofS2Enhanced->Clone( ("tof_s2_" + ts(i)).c_str()  ) );
+			book->style( "tof_s2_"  + ts(i) )->set( "style.tof" )
+				 ->set( "title", "1/#beta : " + ts(p,4) + " < P_{T} < " + ts(p2,4) )
+				 ->set("domain", tofLow, tofHigh )->draw();
+				 gPad->SetGrid();
+			book->cd( "scratch" );
+		}
+
+		pReport[ name ]->savePage();
+		pReport[ name ]->newPage( 2, 2 );
+
+		if ( true ) {	// show the dedx proj
+			pReport[ name ]->cd( 1, 1 );
+			// Make the all tof tracks histogram
+			TH1* hDedx = proj->ProjectionY();
+			book->add( "dedx_"+ts(i), (TH1*)hDedx->Clone( ("dedx_"+ts(i)).c_str()  ) );
+			book->style( "dedx_"+ts(i) )->set( "style.dedx" ) 	
+				 ->set("domain", dedxLow, dedxHigh )->draw();
+
+			double yMax = hDedx->GetMaximum();
+			double piMean = ( TMath::Log10(dedxGen->mean( p+.1, eMass( "Pi" ) ))  - TMath::Log10(dedxGen->mean( p+.1, eMass( pType ) ))  ) / dedxSigma;
+			TLine * l1 = new TLine( piMean, 0, piMean, yMax );
+			l1->Draw();
+
+
+			// Make the enhanced histogram for the center species
+			pReport[ name ]->cd( 2, 1 );
+			TH2* proj2 = (TH2*)proj->Clone( "proj2");
+			int x1 = proj2->GetXaxis()->FindBin( -1 );
+			int x2 = proj2->GetXaxis()->FindBin( 1 );
+
+			// sets the range to effect the cut in dedx space
+			proj2->GetXaxis()->SetRange( x1, x2 );
+			TH1* hDedxEnhanced = proj2->ProjectionY( "_py" );
+
+			book->add( "dedx_s0_" + ts(i), (TH1*)hDedxEnhanced->Clone( ("dedx_s0_" + ts(i)).c_str()  ) );
+			book->style( "dedx_s0_" + ts(i) )->set( "style.dedx" )
+				 ->set("domain", dedxLow, dedxHigh )->draw();
+
+			pReport[ name ]->cd( 1, 2 );
+			TH2* proj3 = (TH2*)proj->Clone( "proj3");
+			double s1 = (tofGen->mean( avgP, eMass( "Pi" ) ) - tofGen->mean( avgP, eMass( pType ) ) ) / inverseBetaSigma;
+			int s1x1 = proj3->GetXaxis()->FindBin( s1-1 );
+			int s1x2 = proj3->GetXaxis()->FindBin( s1+1 );
+
+			// sets the range to effect the cut in dedx space
+			proj3->GetXaxis()->SetRange( s1x1, s1x2 );
+			TH1* hDedxS1Enhanced = proj3->ProjectionY( "_py" );
+
+			book->add( "dedx_s1_" + ts(i), (TH1*)hDedxS1Enhanced->Clone( ("dedx_s1_" + ts(i)).c_str()  ) );
+			book->style( "dedx_s1_" + ts(i) )->set( "style.dedx" )
+				 ->set("domain", dedxLow, dedxHigh )->draw();
+
+			pReport[ name ]->cd( 2, 2 );
+			TH2* proj4 = (TH2*)proj->Clone( "proj4");
+			double s2 = (tofGen->mean( avgP, eMass( "P" ) ) - tofGen->mean( avgP, eMass( pType ) ) ) / inverseBetaSigma;
+			int s2x1 = proj4->GetXaxis()->FindBin( s2-1 );
+			int s2x2 = proj4->GetXaxis()->FindBin( s2+1 );
+
+			// sets the range to effect the cut in dedx space
+			proj4->GetXaxis()->SetRange( s2x1, s2x2 );
+			TH1* hDedxS2Enhanced = proj4->ProjectionY( "_py2" );
+
+			book->add( "dedx_s2_" + ts(i), (TH1*)hDedxS2Enhanced->Clone( ("dedx_s2_" + ts(i)).c_str()  ) );
+			book->style( "dedx_s2_" + ts(i) )->set( "style.dedx" )
+				 ->set("domain", dedxLow, dedxHigh )->draw();
+	
+		}
+		
 		
 
 		pReport[ name ]->savePage();
 
 	}
 
-	delete dBook;
+
+}
+*/
+void pidHistogramMaker::distributionReport( string pType ){
+
+
+	
+
+	string name = speciesName( pType, 0 );
+
+	cout << "\tSpecies Report : " << name << endl;
+
+	uint nBinsP = pBins.size();
+	
+
+	TH3 * h3 = book->get3D( "nSig_" + name );
+	
+
+	distroData->cd();
+
+	taskProgress tp( pType + " distribution report", nBinsP );
+
+	for ( uint i = 0; i < nBinsP - 1; i ++ ){
+
+		tp.showProgress( i );
+
+		// momentum value used for finding nice range
+		double p = pBins[ i ];
+		double p2 = pBins[ i + 1 ];
+		double avgP = 0.2;
+		if ( i >= 1 ){
+			avgP = (pBins[ i-1 ] + pBins[ i ])/2.0;
+			avgP = averageP[ i-1 ];
+		}
+
+		// start a new page on the report file
+		pReport[ name ]->newPage( 2, 2 );
+
+		// get the h3 and set the current p bin range
+		//h3->GetZaxis()->SetRange( i, i );	
+
+		// get the 2D projection in dedx X tof space
+		TH2* proj = (TH2*)h3->Project3D( "xy" );
+
+		// get information on plot ranges
+		double tofLow, tofHigh, dedxLow, dedxHigh;
+		autoViewport( pType, p, &tofLow, &tofHigh, &dedxLow, &dedxHigh, tofPadding, dedxPadding, tofScalePadding, dedxScalePadding );
+		
+		if ( true ) {	// show the tof proj
+			// Make the all tof tracks histogram
+			TH1* hTof = (TH1D*)proj->ProjectionX()->Clone( ("tof_"+ts(i)).c_str() );
+			hTof->Draw();
+			
+		}
+
+		pReport[ name ]->savePage();
+		
+	}
+
+	distroData->Write();
 
 
 }
@@ -956,7 +1132,6 @@ double pidHistogramMaker::nSigmaDedx( string pType, int iHit, double avgP ){
 		double sigma = dedxSigma; 
 
 		double iL = lh( dedx, iMu, sigma );
-		//cout << " iL " + species[ i ] + " " << iL << endl;
 		double w = dedx + iMuAvg - iMu;
 		
 
@@ -968,14 +1143,7 @@ double pidHistogramMaker::nSigmaDedx( string pType, int iHit, double avgP ){
 		d2 += iLc;
 	}
 
-	//cout << "\tn1 = " << n1 << endl;
-	//cout << "\td1 = " << d1 << endl;
-	//cout << "\tn2 = " << n2 << endl;
-	//cout << "\td2 = " << d2 << endl;
-
-	//cout << "\tp1 = " << p1 << endl;
-	//cout << "\tp2 = " << p2 << endl;
-	double nSig = (n1/d1) - muAvg;
+	double nSig = (n1/d1) - (muAvg );
 
 	return (nSig / dedxSigma);
 
@@ -1017,7 +1185,7 @@ double pidHistogramMaker::nSigmaInverseBeta( string pType, int iHit, double avgP
 	}
 
 	
-	double nSig = (n1/d1) - muAvg;
+	double nSig = (n1/d1) - ( muAvg );
 
 	return (nSig /  inverseBetaSigma);
 

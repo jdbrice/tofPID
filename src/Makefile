@@ -4,7 +4,7 @@ project = pid
 # source suffix
 source = .cpp 
 # object files to make
-objects = pid.o pidHistogramMaker.o TOFrPicoDst.o \
+objects = pid.o pidHistogramMaker.o TOFrPicoDst.o SimultaneousFit.o\
 #			reporter.o 
 
 sources = $(wildcard *.cpp)

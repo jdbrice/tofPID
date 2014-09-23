@@ -36,6 +36,8 @@ private:
 	// the histobook that stores all of our pidHistogramMaker histograms
 	HistoBook *book;
 
+	TFile * distroData;
+
 	// the pico dst for simpler chain usage
 	TOFrPicoDst * pico;
 

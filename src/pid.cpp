@@ -6,6 +6,7 @@
 #include "XmlConfig.h"
 #include "pidHistogramMaker.h"
 #include "ChainLoader.h"
+#include "SimultaneousFit.h"
 
 //#include "pidFitRunner.h"
 
@@ -36,16 +37,28 @@ int main( int argc, char* argv[] ) {
 
             pidHistogramMaker* pid = new pidHistogramMaker( chain, &config  );
             pid->momentumDistributions();
-            //pid->makePidHistograms();
+            pid->makePidHistograms();
             delete pid;
 
-        } /*else if ( "fit" == jt ) {
+        } else if ( "fit" == jt ) {
 
-            pidFitRunner * pid = new pidFitRunner( &config );
-            pid->runFit();
-            delete pid;
+            //pidFitRunner * pid = new pidFitRunner( &config );
+            //pid->runFit();
+            //delete pid;
+        } else if ( "simultaneous" == jt ){
 
-        }*/
+            TFile * in = new TFile( "Kdata.root", "READ" );
+            TH1D * tAll = (TH1D*)in->Get( "tof_9" );
+
+            SimultaneousFit *sf = new SimultaneousFit( 
+                                    tAll, NULL, NULL, NULL, 
+                                    NULL, NULL, NULL, NULL, 
+                                    0.675, &config );
+
+            sf->fitTofAll();
+            delete sf;
+
+        }
         
     }
 
