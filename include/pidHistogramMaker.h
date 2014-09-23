@@ -66,6 +66,9 @@ private:
 	// tof bins
 	double tofMax, tofMin;
 	vector<double> tofBins;
+	// charge bins
+	double chargeMax, chargeMin;
+	vector<double> chargeBins;
 
 	//QA memebers
 	double vOffsetX, vOffsetY;
@@ -108,37 +111,29 @@ public:
 	
 	void momentumDistributions();
 	void makeQA();
-	void makePidHistograms();
+	void makeDedxTofHistograms();
 
 	TGraph* inverseBetaGraph( double m, double p1, double p2, double step = .05 );
 	
 	bool keepEventQA();
 	bool keepTrackQA( uint iHit );
 	
+	void prepareHistograms( string pType );
 
 protected:
 
 	
-	void prepareHistograms( string pType );
+	
 	string speciesName( string pType, int charge = 0);
 	void speciesReport( string pType, int charge, int etaBin = -1 );
 	void distributionReport( string pType );
 
-	double nSigDedx( string pType, int iHit ); 
+	double nSigmaDedx( string pType, int iHit ); 
 	double nSigmaDedx( string pType, int iHit, double avgP );
 
 	double lh( double t, double mu, double sigma );
 
-	double nSigInvBeta( string pType, int iHit  ){
-
-		double betaMeasured = pico->beta[ iHit ];
-		double p = pico->p[ iHit ];
-		double betaExpected = eBeta( eMass( pType ), p );
-		
-		double deltaInvBeta = ( 1.0 / betaMeasured ) - ( 1.0 / betaExpected );
-
-		return (deltaInvBeta / inverseBetaSigma);
-	}
+	double nSigmaInverseBeta( string pType, int iHit  );
 	double nSigmaInverseBeta( string pType, int iHit, double avgP );
 
 	double dBeta( string pType, int iHit  ){
@@ -177,7 +172,7 @@ protected:
 		if ( -1 >= charge )	// negative
 			return "n";
 		else if ( 1 <= charge ) //positive
-			return "p"
+			return "p";
 		return "a";	// all
 	}
 	string speciesName( string centerSpecies, int charge, int ptBin, int etaBin = 0 ){

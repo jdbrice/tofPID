@@ -36,8 +36,9 @@ int main( int argc, char* argv[] ) {
             ChainLoader::load( chain, config.getString( "input.dataDir" ).c_str(), config.getInt( "input.dataDir:maxFiles" ) );
 
             pidHistogramMaker* pid = new pidHistogramMaker( chain, &config  );
-            pid->momentumDistributions();
-            pid->makePidHistograms();
+            //pid->prepareHistograms( "K" );
+            //pid->momentumDistributions();
+            pid->makeDedxTofHistograms();
             delete pid;
 
         } else if ( "fit" == jt ) {

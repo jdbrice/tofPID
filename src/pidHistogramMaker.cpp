@@ -467,7 +467,7 @@ void pidHistogramMaker::momentumDistributions() {
 	}
 
 	// loop through the pt bins
-	for ( int ip = 0; ip < pBins.size()-1; ip++ ){
+	for ( int ip = 0; ip < ptBins.size()-1; ip++ ){
 		TH2* h2 = book->get2D( "pVsPt" );
 		if ( h2 ){
 			h2->GetXaxis()->SetRange( ip+1, ip+1 );
@@ -481,27 +481,32 @@ void pidHistogramMaker::momentumDistributions() {
 }
 
 
-void pidHistogramMaker::makePidHistograms() {
+void pidHistogramMaker::makeDedxTofHistograms() {
+
+	using namespace TMath;
 
 	if ( !_chain ){
-		cout << "[pidHistogramMaker." << __FUNCTION__ << "] ERROR: Invalid chain " << endl;
+		lg->error( __FUNCTION__) << " Invalid chain " << endl;
 		return;
 	}
 
-	Int_t nevents = (Int_t)_chain->GetEntries();
-	cout << "[pidHistogramMaker." << __FUNCTION__ << "] Loaded: " << nevents << " events " << endl;
+	Int_t nEvents = (Int_t)_chain->GetEntries();
+	lg->info(__FUNCTION__) << "Loaded: " << nEvents << endl;
 
-	book->cd( "" );
+	
 
-	vector<string> parts = config->getStringVector( "pType" );
+	vector<string> plcs = config->getStringVector( "centering.species" );
 
-	for ( int i = 0; i < parts.size(); i++ ){
-		prepareHistograms( parts[ i ] );
+	for ( int i = 0; i < plcs.size(); i++ ){
+		prepareHistograms( plcs[ i ] );
 	}
 
-	taskProgress tp( "Making Pid Histograms", nevents );
+	taskProgress tp( "Making Dedx vs. Tof Histograms", nEvents );
+	
+	book->cd( "dedx_tof" );
+
 	// loop over all events to produce the histograms
-	for(Int_t i=0; i<nevents; i++) {
+	for(Int_t i=0; i<nEvents; i++) {
     	_chain->GetEntry(i);
 
     	// report progress
@@ -522,46 +527,34 @@ void pidHistogramMaker::makePidHistograms() {
     		double pt = pico->pt[ iHit ];
 
     		// compute centered distributions for each particle type
-    		for ( int i = 0; i < parts.size(); i++ ){
-    			string pType = parts[ i ];
+    		for ( int i = 0; i < plcs.size(); i++ ){
+    			string pType = plcs[ i ];
     			
     			// collect variables 
 				int charge = pico->charge[ iHit ];
 				double eta = pico->eta[ iHit ];
-				double dedx = nSigDedx( pType, iHit ) - dedxShift;
-				
-				// Configuration allows you to choose between these two metrics
-				double invBeta = nSigInvBeta( pType, iHit) - tofShift;
-				double deltaB = dBeta( pType, iHit );
-				double tof = invBeta;
-				if ( tofMetric == deltaBeta )
-					tof = deltaB;
+
+
+				double dedx = nSigmaDedx( pType, iHit ) - dedxShift;
+				double tof = nSigmaInverseBeta( pType, iHit) - tofShift;
 				
 				// check the limits so we dont process more than we need to
-				if ( pt > pMax || pt < pMin )
+				if ( pt > ptMax || pt < ptMin )
 					continue;
-				//if ( dedx >= dedxMax || dedx <= dedxMin )
-				//	continue;
-				//if ( deltaB >= tofMax || deltaB <= tofMin )
-				//	continue;
 
+				/**
+				 * Get the bin for the current kinematic values
+				 */
+				int ptBin = HistoBook::findBin( ptBins, pt );
+				int etaBin = HistoBook::findBin( etaBins, Abs( eta ) );
+				int chargeBin = HistoBook::findBin( chargeBins, charge );
+				if ( ptBin == 12 || ptBin == 13 || ( pt > 0.7 && pt < 0.85)){
+					//cout << " FOUND YOU !! " << ptBin << endl;
+				}
 				
 
-				// get and fill the histogram for this pType and charge
-				string name = "nSig_" + speciesName( pType, charge );
-				TH3* h3 = ((TH3*)book->get( name ));
-
-				int ptBin = HistoBook::findBin( pBins, pt );
-				double avgP = averageP[ ptBin ];
-				//avgP = (pBins[ ptBin ] + pBins[ ptBin - 1 ] ) / 2.0;
-
-				// get pBin;
-				/*double avgP = 0;
-				if ( h3 ){
-					int pBin = h3->GetZaxis()->FindBin( p );
-					if ( pBin > 0 && pBin < pBins.size() )
-						avgP = (pBins[ pBin ] + pBins[ pBin - 1 ] ) / 2.0;
-				}*/
+				//double avgP = averageP[ ptBin ];
+				double avgP = (ptBins[ ptBin ] + ptBins[ ptBin + 1 ] ) / 2.0;
 
 				/**
 				 * Switch centering methods
@@ -571,17 +564,32 @@ void pidHistogramMaker::makePidHistograms() {
 					tof = nSigmaInverseBeta( pType, iHit, avgP ) - tofShift;
 				}
 
-				if ( h3 ){
-					h3->Fill( dedx, tof, pt );
-				}
 
-				// always fill the charge agnostic histogram
-				name = "nSig_" + speciesName( pType, 0 );
-				h3 = ((TH3*)book->get( name ));
-				if ( h3 ){
-					h3->Fill( dedx, tof, pt );
+				
+				if ( chargeMin <= 0 && chargeMax >= 0 ){ // incude 0 charge
+					string name = speciesName( pType, 0, ptBin, etaBin );	
+					TH2* h2 = book->get2D( name );
+
+					if ( h2 ){
+						h2->Fill( dedx, tof );
+					} else {
+						// this one chould always exist
+						lg->error(__FUNCTION__) << "Could not fill for " << name << endl;
+					}
 				}
-			
+				
+				// fill the histogram for the charge if desired
+				if ( chargeMin <= charge && chargeMax >= charge ){ // incude charge?
+					string name = speciesName( pType, charge, ptBin, etaBin );	
+					TH2* h2 = book->get2D( name );
+
+					if ( h2 ){
+						h2->Fill( dedx, tof );
+					} else {
+						// this one chould always exist
+						lg->error(__FUNCTION__) << "Could not fill for " << name << endl;
+					}
+				}
 
 			} // loop pTypes
     		
@@ -589,13 +597,14 @@ void pidHistogramMaker::makePidHistograms() {
     	
 	} // end loop on events
 
+/*
 	// make particle type reports
-	for ( int i = 0; i < parts.size(); i++ ){
-		//speciesReport( parts[ i ], -1 );
-		//speciesReport( parts[ i ], 0 );
-		distributionReport( parts[ i ] );
-		//speciesReport( parts[ i ], 1 );
-	}
+	for ( int i = 0; i < plcs.size(); i++ ){
+		//speciesReport( plcs[ i ], -1 );
+		//speciesReport( plcs[ i ], 0 );
+		distributionReport( plcs[ i ] );
+		//speciesReport( plcs[ i ], 1 );
+	}*/
 
 }
 
@@ -621,7 +630,7 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 	dedxMin = config->getDouble( "binning.dedx:min" );
 	dedxMax = config->getDouble( "binning.dedx:max" );
 	dedxBins = HistoBook::makeFixedWidthBins( dedxBinWidth, dedxMin, dedxMax );
-
+	lg->info(__FUNCTION__) << "Dedx bins created ( " << dedxMin << ", " << dedxMax << " )" << endl;
 	/**
 	 * Make the Tof Binning
 	 * could be for either 1/beta of delta 1/beta 
@@ -631,27 +640,67 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 	tofMin = config->getDouble( "binning.tof:min" );
 	tofMax = config->getDouble( "binning.tof:max" );
 	tofBins = HistoBook::makeFixedWidthBins( tofBinWidth, tofMin, tofMax );
-
+	lg->info(__FUNCTION__) << "Tof bins created ( " << tofMin << ", " << tofMax << " )" << endl;
 
 	/**
-	 * Make the momentum binning
+	 * Make the momentum transverse binning
+	 * Can choose between fixed and variable width bins
 	 */
-	ptMin = config->getDouble( "binning.pt:min", 0.2 );
-	ptMax = config->getDouble( "binning.pt:max", 4.0 );
-
-	if ( config->nodeExists( "binning.ptBins" ) && config->getDoubleVector( "binning.pBins" ).size() >= 2 ){
+	if ( config->nodeExists( "binning.ptBins" ) && config->getDoubleVector( "binning.ptBins" ).size() >= 2 ){
 		ptBins = config->getDoubleVector( "binning.ptBins" );
-			
-		ptMin = pBins[ 0 ];
-		ptMax = pBins[ ptBins.size() - 1 ];
 	} else {
-		// build the pBins from the range and binWidth
-		double ptBinWidth = config->getDouble( "binning.pt:binWidth", .05 );
-		ptBins = HistoBook::makeFixedWidthBins( ptBinWidth, ptMin, ptMax );
+		// build the ptBins from the range and binWidth
+		ptBins = HistoBook::makeFixedWidthBins( 
+			config->getDouble( "binning.pt:binWidth", .05 ), 
+			config->getDouble( "binning.pt:min", 0.2 ), 
+			config->getDouble( "binning.pt:min", 0.2 ) 
+		);
+	}
+	for ( int i = 0; i < ptBins.size(); i++ ){
+		cout << " ptBin [ " << i << " ] " << ptBins[ i ] << endl;
+	}
+	for ( double vp = 0.7; vp < 0.9; vp += 0.01 ){
+		cout << " findBin for " << vp << " = " << HistoBook::findBin( ptBins, vp ) << endl;	
 	}
 	
-	etaMin = config->getDouble( "binning.etaBins" )
+	ptMin = ptBins[ 0 ];
+	ptMax = ptBins[ ptBins.size() - 1 ];
+	lg->info(__FUNCTION__) << "pT bins created ( " << ptMin << ", " << ptMax << " )" << endl;
 
+	/**
+	 * Make the eta binning
+	 * Can choose between fixed and variable width bins
+	 */
+	if ( config->isVector( "binning.etaBins" ) ){
+		etaBins = config->getDoubleVector( "binning.etaBins" );
+	} else {
+		etaBins = HistoBook::makeFixedWidthBins(
+			config->getDouble( "binning.eta:binWidth", 0.2 ),
+			config->getDouble( "binning.eta:min", 0.0 ),
+			config->getDouble( "binning.eta:max", 1.0 )
+		);
+	}
+	etaMin = etaBins[ 0 ];
+	etaMax = etaBins[ etaBins.size() - 1 ];
+	lg->info(__FUNCTION__) << "eta bins created ( " << etaMin << ", " << etaMax << " )" << endl;
+
+	// this one could be length 0
+	// in general not allowed for bins so use nodeExists instead
+	if ( config->nodeExists( "binning.chargeBins" ) ){
+		chargeBins = config->getDoubleVector( "binning.chargeBins" );
+	} else {
+		lg->info(__FUNCTION__) << "Vector?" <<  endl;
+		chargeBins = HistoBook::makeFixedWidthBins(
+			config->getDouble( "binning.charge:binWidth", 1 ),
+			config->getDouble( "binning.charge:min", -1.0 ),
+			config->getDouble( "binning.charge:max", 1.0 )
+		);
+	}
+	chargeMin = chargeBins[ 0 ];
+	chargeMax = chargeBins[ chargeBins.size() - 1 ];
+	lg->info(__FUNCTION__) << "charge bins created ( " << chargeMin << ", " << chargeMax << " )" << endl;
+
+	
 
 	string title = "";
 
@@ -661,17 +710,51 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 		title = "; n#sigma dedx; #Delta #beta^{-1} / #beta^{-1} ";
 		
 	// create a combined, plus, and minus
-	for ( int charge = -1; charge <= 1; charge ++ ){
+	/*for ( int charge = -1; charge <= 1; charge ++ ){
 
 		string name = "nSig_" + speciesName( pType, charge ) ;
 
 		TH3D * h3 = new TH3D( name.c_str(), title.c_str(), 
 				dedxBins.size()-1, dedxBins.data(), 
 				tofBins.size()-1, tofBins.data(),
-				pBins.size()-1, pBins.data() );
+				ptBins.size()-1, ptBins.data() );
 
 		book->add( name, h3 );
-	}
+	}*/
+
+	book->cd( "dedx_tof" );
+
+	
+
+	// Loop through pt, then eta then charge
+	for ( int ptBin = 0; ptBin < ptBins.size()-1; ptBin++ ){
+
+		double p = ptBins[ ptBin ] + ptBins[ ptBin + 1 ];
+		p /= 2.0;
+
+		double tofLow, tofHigh, dedxLow, dedxHigh;
+		autoViewport( pType, p, &tofLow, &tofHigh, &dedxLow, &dedxHigh, tofPadding, dedxPadding, tofScalePadding, dedxScalePadding );
+		//cout << " p  = " << p << " tof ( " << tofLow << ", "<< tofHigh << " ) " << endl;
+		
+		tofBins = HistoBook::makeFixedWidthBins( tofBinWidth, tofLow, tofHigh );
+		dedxBins = HistoBook::makeFixedWidthBins( dedxBinWidth, dedxLow, dedxHigh );
+
+		for ( int etaBin = 0; etaBin < etaBins.size()-1; etaBin++ ){
+			for ( int chargeBin = 0; chargeBin < chargeBins.size(); chargeBin++ ){
+
+				// the name of the histogram
+				string hName = speciesName( pType, chargeBins[ chargeBin ], ptBin, etaBin );
+
+				string title = "dedx vs. tof; dedx; 1/#beta";
+
+				// make it and keep it in the HistoBook
+				book->make2D( hName, title, 
+					dedxBins.size()-1, dedxBins.data(),
+					tofBins.size()-1, tofBins.data() );
+
+			}// loop on charge
+		}// loop on eta bins
+	} // loop on ptBins
 	
 	histosReady = true;
 
@@ -684,7 +767,7 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 
 	cout << "\tSpecies Report : " << name << endl;
 
-	uint nBinsP = pBins.size();
+	uint nBinsP = ptBins.size();
 	
 
 	TH3 * h3 = book->get3D( "nSig_" + name );
@@ -696,7 +779,7 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 		tp.showProgress( i );
 
 		// momentum value used for finding nice range
-		double p = pBins[ i ];
+		double p = ptBins[ i ];
 
 
 		pReport[ name ]->newPage( 2, 2 );
@@ -710,7 +793,7 @@ void pidHistogramMaker::speciesReport( string pType, int charge, int etaBin ){
 		double pHi = h3->GetZaxis()->GetBinLowEdge( i + 1 );
 		if ( 0 == i ){
 			pLow = h3->GetZaxis()->GetBinLowEdge( 1 );
-			pHi = h3->GetZaxis()->GetBinLowEdge( pBins.size()-1 );
+			pHi = h3->GetZaxis()->GetBinLowEdge( ptBins.size()-1 );
 		}
 		
 
@@ -787,7 +870,7 @@ void pidHistogramMaker::distributionReport( string pType ){
 
 	cout << "\tSpecies Report : " << name << endl;
 
-	uint nBinsP = pBins.size();
+	uint nBinsP = ptBins.size();
 	
 
 	TH3 * h3 = book->get3D( "nSig_" + name );
@@ -799,11 +882,11 @@ void pidHistogramMaker::distributionReport( string pType ){
 		tp.showProgress( i );
 
 		// momentum value used for finding nice range
-		double p = pBins[ i ];
-		double p2 = pBins[ i + 1 ];
+		double p = ptBins[ i ];
+		double p2 = ptBins[ i + 1 ];
 		double avgP = 0.2;
 		if ( i >= 1 ){
-			avgP = (pBins[ i-1 ] + pBins[ i ])/2.0;
+			avgP = (ptBins[ i-1 ] + ptBins[ i ])/2.0;
 			avgP = averageP[ i-1 ];
 		}
 
@@ -971,7 +1054,7 @@ void pidHistogramMaker::distributionReport( string pType ){
 
 	cout << "\tSpecies Report : " << name << endl;
 
-	uint nBinsP = pBins.size();
+	uint nBinsP = ptBins.size();
 	
 
 	TH3 * h3 = book->get3D( "nSig_" + name );
@@ -986,11 +1069,11 @@ void pidHistogramMaker::distributionReport( string pType ){
 		tp.showProgress( i );
 
 		// momentum value used for finding nice range
-		double p = pBins[ i ];
-		double p2 = pBins[ i + 1 ];
+		double p = ptBins[ i ];
+		double p2 = ptBins[ i + 1 ];
 		double avgP = 0.2;
 		if ( i >= 1 ){
-			avgP = (pBins[ i-1 ] + pBins[ i ])/2.0;
+			avgP = (ptBins[ i-1 ] + ptBins[ i ])/2.0;
 			avgP = averageP[ i-1 ];
 		}
 
@@ -1091,7 +1174,17 @@ void pidHistogramMaker::autoViewport( 	string pType,
 }
 
 
-double pidHistogramMaker::nSigDedx( string pType, int iHit ){ 
+/**
+ *  N Sigma Calculations ************************************
+ */
+
+/**
+ * Calculates the difference from the expected value of log10( dedx )
+ * @param  pType particle type
+ * @param  iHit  hit index in the nTuple
+ * @return       n Sigma from expectation
+ */
+double pidHistogramMaker::nSigmaDedx( string pType, int iHit ){ 
 			
 	double p = pico->p[ iHit ];
 	double mean = TMath::Log10( dedxGen->mean( p, eMass( pType ) ) * 1000 );
@@ -1103,6 +1196,13 @@ double pidHistogramMaker::nSigDedx( string pType, int iHit ){
 	return -999.0;
 }
 
+/**
+ * Calculates the difference from the expected value of log10( dedx )
+ * Uses the non-linear recentering scheme
+ * @param  pType particle type
+ * @param  iHit  hit index in the nTuple
+ * @return       n Sigma from expectation
+ */
 double pidHistogramMaker::nSigmaDedx( string pType, int iHit, double avgP ){
 
 	double p = pico->p[ iHit ];
@@ -1143,6 +1243,30 @@ double pidHistogramMaker::nSigmaDedx( string pType, int iHit, double avgP ){
 
 }
 
+
+/**
+ * Calculates the difference from the expected value of 1/beta
+ * @param  pType particle type
+ * @param  iHit  hit index in the nTuple
+ * @return       n Sigma from expectation
+ */
+double pidHistogramMaker::nSigmaInverseBeta( string pType, int iHit  ){
+
+	double betaMeasured = pico->beta[ iHit ];
+	double p = pico->p[ iHit ];
+	double betaExpected = eBeta( eMass( pType ), p );
+	double deltaInvBeta = ( 1.0 / betaMeasured ) - ( 1.0 / betaExpected );
+
+	return (deltaInvBeta / inverseBetaSigma);
+}
+
+/**
+ * Calculates the difference from the expected value of 1/beta
+ * Uses the nonlinear recentering scheme
+ * @param  pType particle type
+ * @param  iHit  hit index in the nTuple
+ * @return       n Sigma from expectation
+ */
 double pidHistogramMaker::nSigmaInverseBeta( string pType, int iHit, double avgP ){
 
 	double p = pico->p[ iHit ];
@@ -1185,7 +1309,14 @@ double pidHistogramMaker::nSigmaInverseBeta( string pType, int iHit, double avgP
 
 }
 
-
+/**
+ * Likelihood function
+ * A gauss around the expected value with expected sigma
+ * @param  x     measured value
+ * @param  mu    expected mean
+ * @param  sigma expected sigma
+ * @return       the unnormalized likelihood
+ */
 double pidHistogramMaker::lh( double x, double mu, double sigma ){
 
 	double a = sigma * TMath::Sqrt( 2 * TMath::Pi() );
