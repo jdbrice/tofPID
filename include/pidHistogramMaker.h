@@ -16,6 +16,8 @@
 // for testing if stdout is interactive or pipe / file
 #include "XmlConfig.h"
 #include "Utils.h"
+#include "Logger.h"
+#include "LoggerConfig.h"
 
 using namespace jdb;
 
@@ -25,6 +27,8 @@ using namespace jdb;
 class pidHistogramMaker{
 
 private:
+
+	Logger * lg;
 
 	// the canvas used to draw report hidtos
 	Reporter* report;
@@ -50,10 +54,16 @@ private:
 
 
 	// binning information
-	double pMax, pMin;
-	vector<double> pBins;
+	// pt Bins
+	double ptMax, ptMin;
+	vector<double> ptBins;
+	// eta bins
+	double etaMax, etaMin;
+	vector<double> etaBins;
+	// dedx bins
 	double dedxMax, dedxMin;
 	vector<double> dedxBins;
+	// tof bins
 	double tofMax, tofMin;
 	vector<double> tofBins;
 
@@ -161,6 +171,29 @@ protected:
 		if ( "Pi" == pType )
 			return constants::piMass;
 		return -10.0;	
+	}
+
+	string chargeString( int charge = 0 ) {
+		if ( -1 >= charge )	// negative
+			return "n";
+		else if ( 1 <= charge ) //positive
+			return "p"
+		return "a";	// all
+	}
+	string speciesName( string centerSpecies, int charge, int ptBin, int etaBin = 0 ){
+		return "dedx_tof_" + chargeString(charge) + "_" + centerSpecies + "_" + ts(ptBin) + "_" + ts(etaBin);
+	}
+	string sTofName( string centerSpecies, int charge, int ptBin, int etaBin = 0, string eSpecies = "" ){
+		if ( "" == eSpecies )
+			return "tof_" + chargeString(charge) + "_" + centerSpecies + "_" + ts(ptBin) + "_" + ts(etaBin);
+		else
+			return "tof_" + chargeString(charge) + "_" + centerSpecies + "_" + ts(ptBin) + "_" + ts(etaBin) + "_" + eSpecies;
+	}
+	string sDedxName( string centerSpecies, int charge, int ptBin, int etaBin = 0, string eSpecies = "" ){
+		if ( "" == eSpecies )
+			return "dedx_" + chargeString(charge) + "_" + centerSpecies + "_" + ts(ptBin) + "_" + ts(etaBin);
+		else
+			return "dedx_" + chargeString(charge) + "_" + centerSpecies + "_" + ts(ptBin) + "_" + ts(etaBin) + "_" + eSpecies;
 	}
 
 	void autoViewport( 	string pType, double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 

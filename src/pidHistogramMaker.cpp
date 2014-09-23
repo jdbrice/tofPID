@@ -24,7 +24,11 @@ const vector<string> pidHistogramMaker::species = {"Pi","K","P"};
  *					for a sample configuration.
  */
 pidHistogramMaker::pidHistogramMaker( TChain* chain, XmlConfig* con )  {
-	cout << "[pidHistogramMaker.pidHistogramMaker] " << endl;
+	
+
+	lg = LoggerConfig::makeLogger( con, "Logger" );
+
+	lg->info(__FUNCTION__) << endl;
 	
 	gErrorIgnoreLevel=kSysError ;
 
@@ -91,7 +95,7 @@ pidHistogramMaker::pidHistogramMaker( TChain* chain, XmlConfig* con )  {
  *	Destructor - Deletes the histoBook ensuring it is saved.
  */
 pidHistogramMaker::~pidHistogramMaker() {
-	
+	lg->info(__FUNCTION__) << endl;
 	delete book;
 	delete report;
 
@@ -104,7 +108,7 @@ pidHistogramMaker::~pidHistogramMaker() {
 		}
 	}
 	
-	cout << "[pidHistogramMaker.~pidHistogramMaker] " << endl;
+	lg->info(__FUNCTION__) << "Freed Memory" << endl;
 }
 
 void pidHistogramMaker::makeQA() {
@@ -607,19 +611,16 @@ string pidHistogramMaker::speciesName( string pType, int charge ){
 }
 
 void pidHistogramMaker::prepareHistograms( string pType ) {
-	cout << "[pidHistogramMaker." << __FUNCTION__ << "] Center Species : " << pType << endl;
+	
+	lg->info(__FUNCTION__) << "Making Histograms with centering spceies: " << pType << endl;
+
 	/**
 	 * Make the dedx binning 
 	 */
 	double dedxBinWidth = config->getDouble( "binning.dedx:binWidth" );
 	dedxMin = config->getDouble( "binning.dedx:min" );
 	dedxMax = config->getDouble( "binning.dedx:max" );
-
-	for ( double i = dedxMin; i <= dedxMax; i += dedxBinWidth ){
-		dedxBins.push_back( i );
-	}
-	
-	cout << "\tDedx bins created" << endl;
+	dedxBins = HistoBook::makeFixedWidthBins( dedxBinWidth, dedxMin, dedxMax );
 
 	/**
 	 * Make the Tof Binning
@@ -629,32 +630,27 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 	double tofBinWidth = config->getDouble( "binning.tof:binWidth" );
 	tofMin = config->getDouble( "binning.tof:min" );
 	tofMax = config->getDouble( "binning.tof:max" );
-
-	for ( double i = tofMin; i <= tofMax; i += tofBinWidth ){
-		tofBins.push_back( i );
-	}
-	cout << "\tTof bins created" << endl;
+	tofBins = HistoBook::makeFixedWidthBins( tofBinWidth, tofMin, tofMax );
 
 
 	/**
 	 * Make the momentum binning
 	 */
-	pMin = config->getDouble( "binning.p:min" );
-	pMax = config->getDouble( "binning.p:max" );
+	ptMin = config->getDouble( "binning.pt:min", 0.2 );
+	ptMax = config->getDouble( "binning.pt:max", 4.0 );
 
-	if ( config->nodeExists( "binning.pBins" ) && config->getDoubleVector( "binning.pBins" ).size() >= 2 ){
-		pBins = config->getDoubleVector( "binning.pBins" );
+	if ( config->nodeExists( "binning.ptBins" ) && config->getDoubleVector( "binning.pBins" ).size() >= 2 ){
+		ptBins = config->getDoubleVector( "binning.ptBins" );
 			
-		pMin = pBins[ 0 ];
-		pMax = pBins[ pBins.size() - 1 ];
+		ptMin = pBins[ 0 ];
+		ptMax = pBins[ ptBins.size() - 1 ];
 	} else {
 		// build the pBins from the range and binWidth
-		double pBinWidth = config->getDouble( "binning.p:binWidth", .05 );
-		for ( double i = pMin; i <= pMax; i+= pBinWidth ){
-			pBins.push_back( i );
-		}
+		double ptBinWidth = config->getDouble( "binning.pt:binWidth", .05 );
+		ptBins = HistoBook::makeFixedWidthBins( ptBinWidth, ptMin, ptMax );
 	}
-	cout << "\tMomentum bins created" << endl;
+	
+	etaMin = config->getDouble( "binning.etaBins" )
 
 
 	string title = "";
@@ -664,8 +660,6 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 	else 
 		title = "; n#sigma dedx; #Delta #beta^{-1} / #beta^{-1} ";
 		
-	
-	
 	// create a combined, plus, and minus
 	for ( int charge = -1; charge <= 1; charge ++ ){
 
