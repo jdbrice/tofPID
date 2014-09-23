@@ -500,7 +500,7 @@ void pidHistogramMaker::makeDedxTofHistograms() {
 	for ( int i = 0; i < plcs.size(); i++ ){
 		prepareHistograms( plcs[ i ] );
 	}
-
+	return;
 	taskProgress tp( "Making Dedx vs. Tof Histograms", nEvents );
 	
 	book->cd( "dedx_tof" );
@@ -659,9 +659,10 @@ void pidHistogramMaker::prepareHistograms( string pType ) {
 	for ( int i = 0; i < ptBins.size(); i++ ){
 		cout << " ptBin [ " << i << " ] " << ptBins[ i ] << endl;
 	}
-	for ( double vp = 0.7; vp < 0.9; vp += 0.01 ){
-		cout << " findBin for " << vp << " = " << HistoBook::findBin( ptBins, vp ) << endl;	
-	}
+	
+	cout << "FINDING" << endl;
+	HistoBook::findBin( ptBins, 0.77 );
+	
 	
 	ptMin = ptBins[ 0 ];
 	ptMax = ptBins[ ptBins.size() - 1 ];
