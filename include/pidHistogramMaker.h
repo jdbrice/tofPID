@@ -126,13 +126,36 @@ protected:
 	void speciesReport( string pType, int charge, int etaBin = -1 );
 	void distributionReport( string pType );
 
+	/**
+	 * Calculates the nSigma dEdx value with the centroid of plc pType
+	 * set to zero
+	 * @param  pType The plc species for centering
+	 * @param  iHit  The hit index in the pico-dst
+	 * @return       Returns the # of nSigmas from the center species.
+	 * Uses the "plotSigma" to allow this to be either raw values
+	 * or nSigmas calculated using a fixed sigma value
+	 */
 	double nSigmaDedx( string pType, int iHit ); 
 	double nSigmaDedx( string pType, int iHit, double avgP );
 
-	double lh( double t, double mu, double sigma );
-
+	/**
+	 * Calculates the nSigma 1/beta value with centering around plc species pType
+	 * @param  pType Centering species
+	 * @param  iHit  The hit index in the pico-dst
+	 * @return       Returns the # of nSigma from the center species. 
+	 * See nSigmaDedx for notes.
+	 */
 	double nSigmaInverseBeta( string pType, int iHit  );
 	double nSigmaInverseBeta( string pType, int iHit, double avgP );
+
+	/**
+	 * A gaussian to calculate the likelihood of being a plc species
+	 * @param  t     the input measurement
+	 * @param  mu    the mean of the gauss
+	 * @param  sigma the sigma to use
+	 * @return       Returns the unnormalized likelihood value
+	 */
+	double lh( double t, double mu, double sigma );
 
 	double dBeta( string pType, int iHit  ){
 
@@ -156,6 +179,7 @@ protected:
 	double eBeta( double m, double p ){
 		return TMath::Sqrt( p*p / ( p*p + m*m ) );
 	}
+	
 	double eMass( string pType ){
 		if ( "P" == pType )
 			return constants::protonMass;

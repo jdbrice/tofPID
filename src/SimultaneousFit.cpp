@@ -15,10 +15,14 @@
 
 #include "Reporter.h"
 
+
 SimultaneousFit::SimultaneousFit( 	TH1D* tAll, TH1D* tS0, TH1D* tS1, TH1D* tS2,
 									TH1D* dAll, TH1D* dS0, TH1D* dS1, TH1D* dS2,
 									double p, XmlConfig * config, string nodePath 
 		){
+
+
+	lg = LoggerConfig::makeLogger( config, "Logger" );
 
 	tofAll = tAll;
 	tofS0 = tS0;
@@ -46,21 +50,22 @@ SimultaneousFit::~SimultaneousFit(){
 
 void SimultaneousFit::fitTofAll( ){
 
+	lg->info(__FUNCTION__) << "Fitting to Tof All tracks Only " << endl;
+
 	Reporter rp( "tofAll.pdf" );
-	Logger l( Logger::llInfo );
 
 	// get some limits
 	double c = tGen->mean( avgP, constants::kaonMass );
-	double x1 = (tGen->mean( avgP, constants::piMass ) - c)/0.012;
-	double x2 = (tGen->mean( avgP, constants::protonMass ) - c )/0.012;
+	double x1 = (tGen->mean( avgP, constants::piMass ) - c);
+	double x2 = (tGen->mean( avgP, constants::protonMass ) - c );
 
-	l.info() << " p = " << avgP << endl;
-	l.info() << " center " << c << endl;
-	l.info() << " x1 " << x1 << endl;
-	l.info() << " x2 " << x2 << endl;
+	lg->info() << " p = " << avgP << endl;
+	lg->info() << " center " << c << endl;
+	lg->info() << " x1 " << x1 << endl;
+	lg->info() << " x2 " << x2 << endl;
 
 	// build a 3 gaussian model
-	RooRealVar *tof = new RooRealVar( "tofx", "tofx", -10, 10 );
+	RooRealVar *tof = new RooRealVar( "tofx", "tofx", x1, x2 );
 	RooDataHist * rdh = new RooDataHist( "data", "data", RooArgSet( * tof ), tofAll  );
 	
 

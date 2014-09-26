@@ -3,10 +3,13 @@
 
 #include "XmlConfig.h"
 #include "tofGenerator.h"
+#include "Logger.h"
+#include "LoggerConfig.h"
 
 using namespace jdb;
 
 #include "TH1D.h"
+
 
 class SimultaneousFit
 {
@@ -22,6 +25,8 @@ protected:
 
 	XmlConfig * config;
 	string path;
+
+	Logger * lg;
 
 public:
 	SimultaneousFit( 	TH1D* tAll, TH1D* tS0, TH1D* tS1, TH1D* tS2,
