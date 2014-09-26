@@ -8,6 +8,8 @@
 #include "ChainLoader.h"
 #include "SimultaneousFit.h"
 
+#include "Bichsel.h"
+
 //#include "pidFitRunner.h"
 
 using namespace jdb;
@@ -19,6 +21,9 @@ int main( int argc, char* argv[] ) {
         config.report();
 
         string jt = config.getString( "jobType" );
+
+        Bichsel * bsel = new Bichsel( config.getString( "input.bichselTabels", "dedxBichsel.root" ), 0 );
+        cout << bsel->mean( .5, .139 );
         
         if ( "makeQA" == jt ){
           
@@ -36,7 +41,7 @@ int main( int argc, char* argv[] ) {
             ChainLoader::load( chain, config.getString( "input.dataDir" ).c_str(), config.getInt( "input.dataDir:maxFiles" ) );
 
             pidHistogramMaker* pid = new pidHistogramMaker( chain, &config  );
-            //pid->prepareHistograms( "K" );
+            
             //pid->momentumDistributions();
             pid->makeDedxTofHistograms();
             delete pid;
@@ -48,8 +53,8 @@ int main( int argc, char* argv[] ) {
             //delete pid;
         } else if ( "simultaneous" == jt ){
 
-            TFile * in = new TFile( "Kdata.root", "READ" );
-            TH1D * tAll = (TH1D*)in->Get( "tof_9" );
+            TFile * in = new TFile( "histogram/nl1k.root", "READ" );
+            TH1D * tAll = (TH1D*)in->Get( "tof/tof_a_K_9_0" );
 
             SimultaneousFit *sf = new SimultaneousFit( 
                                     tAll, NULL, NULL, NULL, 

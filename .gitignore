@@ -23,4 +23,5 @@
 /bin/QA/
 # but keep the sample config
 !/bin/config.xml
+!/bin/dedxBichsel.root
 

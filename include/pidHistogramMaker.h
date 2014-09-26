@@ -7,7 +7,7 @@
 #include "constants.h"
 #include "TOFrPicoDst.h"
 #include "tofGenerator.h"
-#include "dedxGenerator.h"
+#include "Bichsel.h"
 #include <vector>
 
 // clock_t, clock, CLOCKS_PER_SEC 
@@ -80,11 +80,11 @@ private:
 	string tofMetric;
 	static const string inverseBeta;
 	static const string deltaBeta;
-	double inverseBetaSigma;
+	double tofSigma, tofPlotSigma;
 	tofGenerator * tofGen;
 
-	double dedxSigma;
-	dedxGenerator * dedxGen;
+	double dedxSigma, dedxPlotSigma;
+	Bichsel * dedxGen;
 
 	string centeringMethod;
 	double dedxShift;
@@ -122,9 +122,7 @@ public:
 
 protected:
 
-	
-	
-	string speciesName( string pType, int charge = 0);
+
 	void speciesReport( string pType, int charge, int etaBin = -1 );
 	void distributionReport( string pType );
 
@@ -175,6 +173,9 @@ protected:
 			return "p";
 		return "a";	// all
 	}
+	string speciesName( string centerSpecies, int charge = 0 ){
+		return "dedx_tof_" + chargeString(charge) + "_" + centerSpecies;
+	}
 	string speciesName( string centerSpecies, int charge, int ptBin, int etaBin = 0 ){
 		return "dedx_tof_" + chargeString(charge) + "_" + centerSpecies + "_" + ts(ptBin) + "_" + ts(etaBin);
 	}
@@ -194,6 +195,40 @@ protected:
 	void autoViewport( 	string pType, double p, double * tofLow, double* tofHigh, double * dedxLow, double * dedxHigh, 
 						double tofPadding = 1, double dedxPadding = 1, double tofScaledPadding = 0, double dedxScaledPadding = 0 );
 
+	vector<string> otherSpecies( string center ){
+		string species[] = {"Pi", "K", "P" };
+		vector<string> res;
+		for ( int i = 0; i < 3; i++ ){
+			if ( species[ i ] != center )
+				res.push_back( species[ i ] );
+		}
+		return res;
+	}
+	vector<double> enhanceTof( string center, vector<string> others, double p ){
+
+		double cMean = tofGen->mean( p, eMass( center ) );
+		
+		vector<double> res;
+		for ( int i = 0; i < others.size(); i++ ){
+			double m = (tofGen->mean( p, eMass( others[ i ] ) ) - cMean) / tofPlotSigma;
+			res.push_back( m );
+		}
+
+		return res;
+	}
+
+	vector<double> enhanceDedx( string center, vector<string> others, double p ){
+		using namespace TMath;
+		double cMean = Log10(dedxGen->mean( p, eMass( center ) ));
+		
+		vector<double> res;
+		for ( int i = 0; i < others.size(); i++ ){
+			double m = (Log10(dedxGen->mean( p, eMass( others[ i ] ) )) - cMean) / dedxPlotSigma;
+			res.push_back( m );
+		}
+
+		return res;
+	}
 
 	/*
 	*	Utility functions that should be moved soon
